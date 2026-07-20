@@ -253,3 +253,64 @@ Prefer the **index** URL so every shard is loaded.
 | Free hosting OK? | **Yes for light personal use** + cloud; not for heavy multi-user load |
 | Still call other APIs on free? | **Yes**, subject to provider free quotas |
 | What breaks first? | **RAM on pull**, **UI listing**, or **API 429s** — not usually disk alone |
+
+---
+
+## Pull cloud: does it only load 100,000 wallets?
+
+**No.** **100,000 is per cloud *file* (shard), not the maximum a Pull loads in total.**
+
+### What one Pull does
+
+1. Reads **`data/wallets_index.json`**
+2. Loads **every** shard listed there (`wallets_cloud.json`, `wallets_cloud_002.json`, …)
+3. Merges each into the **local multi-DB** (`rugwatch.db`, then `rugwatch_002.db` when full, etc.)
+
+So if cloud has **3 shards × ~100k**, one Pull tries to load **~300,000 wallets**, not only 100k.
+
+| Cloud layout | What Pull loads |
+|--------------|-----------------|
+| 1 file, e.g. 46 wallets | **All of them** |
+| 1 full shard | Up to **~100,000** |
+| 5 full shards | Up to **~500,000** (all of them) |
+| N shards in the index | **All N files** |
+
+### What 100k *does* mean
+
+| Cap | Meaning |
+|-----|--------|
+| **Cloud shard** | One JSON file tops out near **100k**; the **next** wallet goes in the **next** shard file on **Push cloud** |
+| **Local DB** | One SQLite file tops out near **100k**; the next wallet goes in **`rugwatch_002.db`**, etc. |
+| **Pull cloud** | Loads **all** cloud shards (total can be **greater than 100k**) |
+
+### What happens if you keep pulling
+
+| Situation | Result |
+|-----------|--------|
+| Same wallets already in local DB | **Skipped** — no duplicates (`skip_existing` on import) |
+| New wallets only in cloud | **Imported** |
+| Local DB hits ~100k | New local file: `rugwatch_002.db`, … |
+| Pull again with nothing new | **Imported ≈ 0**, high skipped — safe, list size does not grow from copies |
+
+**Pull is a merge**, not “download only 100k then stop forever.”  
+Repeating Pull is mostly **idempotent**: addresses already local are not stored twice.
+
+### ATC / other readers vs RugWatch Pull
+
+| Consumer | Behavior |
+|----------|----------|
+| **RugWatch website / desktop Pull cloud** | Uses the **index** → loads **every** shard |
+| **ATC** with `.../data/wallets_index.json` | Should load **every** shard listed in the index |
+| **ATC** (or anything) pointed only at a **single** `wallets_cloud.json` | May only see **one** shard (~100k max for that file) |
+
+**Always prefer the index URL** for flags:
+
+```text
+RUGWATCH_WALLETS_URL=https://raw.githubusercontent.com/YourUser/RugWatch/main/data/wallets_index.json
+```
+
+### Practical takeaway
+
+- **One Pull ≠ only 100k max.** It is “**all shards in the index**.”  
+- **Keep pulling** → only **new** cloud wallets are added; existing ones are **skipped**.  
+- Risk at huge scale is **RAM/time** if the cloud has many full shards — not “the app only allows one 100k pull.”

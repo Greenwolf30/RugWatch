@@ -27,7 +27,8 @@ python run_web.py --port 8790
 Open http://127.0.0.1:8790/ — on-site docs: `/docs.html`.
 
 **Capacity:** about **100,000** wallets per local DB file and per cloud file, then a new file is created automatically (no fixed total cap).  
-Full limits charts (PC pull, free hosting, API quotas): **EXTERNAL_STORAGE.md** → *Capacity limits (full guide)*.
+**Pull cloud** loads **all** shards from the index (not “only 100k total”); re-pull skips wallets already local.  
+Full limits + Pull FAQ: **EXTERNAL_STORAGE.md** → *Capacity limits* and *Pull cloud: does it only load 100,000 wallets?*
 
 **Actual Token Checker:** Ruggers **Upload** can send sellers here; Analyze flags read local and/or cloud lists. Full guide: **RugCheck Documentation.md**.
 

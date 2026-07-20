@@ -795,6 +795,24 @@ Quality of flags still beats dumping everything.
 **Full charts (cloud size, APIs, free hosting, bottom-line Q&A):**  
 **EXTERNAL_STORAGE.md** → *Capacity limits (full guide)*.
 
+### Pull cloud FAQ (100k myth)
+
+**Does Pull only load 100,000 wallets?**  
+**No.** 100k is **per cloud file**. Pull reads **`wallets_index.json`** and loads **every** shard.
+
+| If cloud has… | One Pull loads… |
+|---------------|-----------------|
+| 1 shard | Up to ~100k (or however many are in that file) |
+| 5 shards | Up to ~500k total |
+| N shards | **All N files** |
+
+**What if you keep Pulling?**  
+Already-local wallets are **skipped** (no duplicates). Only **new** cloud wallets import. Local DB also auto-shards at 100k (`rugwatch_002.db`, …).
+
+**ATC tip:** Point at the **index** URL, not only `wallets_cloud.json`, so flags see every shard.
+
+Full write-up: **EXTERNAL_STORAGE.md** → *Pull cloud: does it only load 100,000 wallets?*
+
 ---
 
 ## Project layout (RugWatch only)
