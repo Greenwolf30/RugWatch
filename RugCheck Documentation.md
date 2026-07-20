@@ -749,6 +749,24 @@ RugWatch **auto-shards** local DBs and cloud JSON. There is **no fixed total cap
 **Pull cloud** merges every cloud shard.  
 Pills = **sum across all shards**.
 
+### Disk size (order of magnitude)
+
+Each wallet ≈ **200–500+ bytes** (longer notes = bigger files).
+
+| Wallets | Cloud JSON (rough) | Notes |
+|---------|-------------------|--------|
+| 10k | ~2–5 MB | 1 shard |
+| 100k | ~20–50 MB | 1 shard |
+| **200k** | **~40–100 MB** | **2 shards** |
+| 1M | ~200–500 MB | 10 shards |
+
+Local DB after a full Pull is usually **similar size** to cloud.  
+**Example:** 200k wallets cloud + full local copy ≈ **~100–200 MB** of wallet data + only a few MB of app code.
+
+**Is ~200 MB a lot for a laptop?** **No** — tiny vs a normal drive (under ~0.1% of 256 GB). A few phone photos’ worth. Disk almost never fills first; **RAM on pull** and **UI listing** hurt sooner.
+
+**ATC website Logs** (History, max **200** searches) live in the **browser only** (~3–5 MB maxed). They are **not** on RugWatch cloud, GitHub, or the Render server. See **EXTERNAL_STORAGE.md** §2b–2c.
+
 ### Effective speed guidance
 
 | Total wallets | Feel |

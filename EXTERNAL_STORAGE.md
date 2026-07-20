@@ -130,14 +130,66 @@ RugWatch **auto-shards**. There is **no hard total wallet ceiling** in the app.
 
 Each wallet row is roughly **200–500+ bytes** (address, score, notes, labels). Long notes inflate size.
 
-| Wallets | Rough cloud JSON size (order of magnitude) |
-|---------|--------------------------------------------|
-| 10,000 | ~2–5 MB |
-| 100,000 (1 shard) | ~20–50 MB |
-| 1,000,000 (10 shards) | ~200–500 MB |
-| 10,000,000 | multi‑GB (many shards) |
+| Wallets | Shards (at 100k each) | Rough cloud JSON size (order of magnitude) |
+|---------|----------------------|--------------------------------------------|
+| 10,000 | 1 | ~2–5 MB |
+| 100,000 | 1 | ~20–50 MB |
+| **200,000** | **2** | **~40–100 MB** |
+| 500,000 | 5 | ~100–250 MB |
+| 1,000,000 | 10 | ~200–500 MB |
+| 10,000,000 | many | multi‑GB |
+
+Local SQLite (after a full Pull) is usually the **same order of magnitude** as the cloud total for that wallet count.
+
+**Example — 200,000 wallets maxed on RugWatch**
+
+| Piece | Where it lives | Rough size |
+|-------|----------------|------------|
+| Cloud JSON (2 shards + index) | GitHub `data/wallets_cloud*.json` | **~40–100 MB** |
+| Local DB (if fully pulled) | `data/rugwatch.db` (+ `_002` if needed) | **~40–100 MB** again on that machine |
+| RugWatch **application code** | repo / deploy | **~few MB** (tiny next to wallets) |
+| **Whole stack if cloud + one full local copy** | — | **~100–200 MB** wallet data + small code |
 
 Disk rarely “runs out” first on a home PC. **RAM during import** and **trying to list everything in the browser** usually hurt first.
+
+---
+
+### 2b) Is ~200 MB a lot for a laptop?
+
+**No. ~200 MB is tiny for a normal laptop.**
+
+| Size | Feels like |
+|------|------------|
+| **200 MB** | A few phone photos, or part of one music album |
+| 1 GB | About 5× that |
+| 256–512 GB+ | Typical whole laptop drive |
+
+- **200 MB** is under **0.1%** of a **256 GB** drive — you will not notice it for storage.
+- Loading **~200 MB into RAM once** is fine on a typical laptop (**8 GB+ RAM**).
+- Pressure at high wallet counts is usually **slow Push/Pull**, **free-host RAM**, or **UI listing**, not “disk full.”
+
+**Rule of thumb:** wallet data in the **tens–low hundreds of MB** is normal laptop territory; multi‑GB only appears if you go toward **millions** of wallets with long notes.
+
+---
+
+### 2c) What is *not* part of RugWatch cloud size (ATC website Logs)
+
+**Actual Token Checker (website) Logs** are **not** stored on RugWatch, GitHub cloud, or the Render server.
+
+| Data | Where it lives | Grows RugWatch cloud? |
+|------|----------------|------------------------|
+| RugWatch wallet list (Push cloud) | GitHub + optional local DB | **Yes** |
+| ATC website **Logs** (History tab, max **200** searches) | **Browser localStorage only** (`adtc_history_log`) | **No** |
+| ATC **Ruggers** track (browser) | Browser storage | **No** |
+| ATC application code | ATC deploy / repo (~**1 MB**) | **No** |
+
+Maxed ATC website Logs (~**200** full Analyze snapshots) is roughly **~3–5 MB in that user’s browser** — separate from every other user, and **0 MB** on the RugWatch server.
+
+So when estimating “how big can things get”:
+
+1. **RugWatch cloud / local wallets** → server + GitHub (see tables above).  
+2. **ATC Logs** → each user’s browser only (cap **200** entries; oldest deleted on later lookups).  
+3. **App code** → stays small; **wallets** dominate disk size.
 
 ---
 
@@ -250,6 +302,9 @@ Prefer the **index** URL so every shard is loaded.
 | Question | Answer |
 |----------|--------|
 | Hard total wallet cap? | **No** — auto-shard at **100k per file** |
+| ~200k wallets on disk? | About **~40–100 MB** cloud (2 shards); **~100–200 MB** if you also keep a full local pull |
+| Is ~200 MB a lot for a laptop? | **No** — tiny vs a normal drive (see §2b) |
+| Do ATC website Logs count toward cloud? | **No** — browser only, max 200 searches (~few MB) |
 | Safe on a normal home PC? | **Hundreds of thousands easily**; **millions** if sharded and RAM allows |
 | Free hosting OK? | **Yes for light personal use** + cloud; not for heavy multi-user load |
 | Still call other APIs on free? | **Yes**, subject to provider free quotas |
