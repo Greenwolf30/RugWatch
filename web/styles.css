@@ -239,7 +239,7 @@ body {
   overflow: auto;
   max-height: 60vh;
 }
-/* Wallets tab: left scores (not clickable); right address click-to-copy */
+/* Wallets tab: scores LEFT (not clickable); addresses FAR RIGHT (click to copy) */
 #panel-wallets .box,
 #walletsBox {
   color: #c47a7a;
@@ -248,23 +248,30 @@ body {
 }
 #walletsBox .w-row {
   display: flex;
-  gap: 14px;
+  flex-direction: row;
+  justify-content: space-between;
   align-items: flex-start;
-  padding: 8px 0;
+  gap: 16px;
+  padding: 10px 4px;
   border-bottom: 1px solid rgba(80, 90, 100, 0.35);
   user-select: text;
+  width: 100%;
 }
 #walletsBox .w-left {
-  flex: 0 0 4.5rem;
+  flex: 0 0 auto;
   color: #c4a84a;
   font-weight: 600;
   white-space: pre;
   pointer-events: none; /* never clickable */
   cursor: default;
+  text-align: left;
 }
 #walletsBox .w-right {
-  flex: 1;
+  flex: 1 1 auto;
   min-width: 0;
+  max-width: 72%;
+  margin-left: auto;
+  text-align: right;
   word-break: break-all;
 }
 #walletsBox .w-meta {
@@ -272,14 +279,17 @@ body {
   color: #c47a7a;
   font-size: 0.9em;
   pointer-events: none;
+  text-align: right;
 }
 #walletsBox a.w-addr {
+  display: inline-block;
   color: #c98a8a;
   text-decoration: underline;
   text-underline-offset: 2px;
   cursor: pointer;
   font-weight: 500;
   pointer-events: auto;
+  text-align: right;
 }
 #walletsBox a.w-addr:hover {
   color: #d9a0a0;
