@@ -210,8 +210,10 @@ def run_gui() -> None:
 
     log_box = make_text(tab_log)
     wallets_box = make_text(tab_wallets)
-    # Wallets tab content: all data in red
+    # Wallets tab: left numbers white; address/notes red
     wallets_box.configure(fg="#ff4d4d", insertbackground="#ff4d4d")
+    wallets_box.tag_configure("w_nums", foreground="#f0f2f5")
+    wallets_box.tag_configure("w_data", foreground="#ff4d4d")
     alerts_box = make_text(tab_alerts)
 
     q: queue.Queue = queue.Queue()
@@ -274,11 +276,13 @@ def run_gui() -> None:
             )
             return
         for w in rows:
-            wallets_box.insert(
-                "end",
-                f"{w.get('risk_score'):3}  x{w.get('times_seen')}  {w.get('address')}\n"
-                f"     [{w.get('label') or ''}] {(w.get('notes') or '')[:80]}\n\n",
+            nums = f"{w.get('risk_score'):3}  x{w.get('times_seen')}"
+            data = (
+                f"  {w.get('address')}\n"
+                f"     [{w.get('label') or ''}] {(w.get('notes') or '')[:80]}\n\n"
             )
+            wallets_box.insert("end", nums, "w_nums")
+            wallets_box.insert("end", data, "w_data")
 
     def refresh_alerts() -> None:
         rows = db.list_alerts(limit=50)

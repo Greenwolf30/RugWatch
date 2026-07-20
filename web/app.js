@@ -112,6 +112,14 @@
     }
   }
 
+  function escHtml(s) {
+    return String(s || "")
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;");
+  }
+
   async function refreshWallets() {
     const box = $("walletsBox");
     try {
@@ -122,20 +130,29 @@
           "No wallets yet.\nUse Add wallet, or Upload manual wallets (next to Add wallet).\n";
         return;
       }
-      box.textContent = rows
-        .map(
-          (w) =>
-            String(w.risk_score).padStart(3) +
-            "  x" +
-            (w.times_seen || 0) +
+      // Left numbers (score, times) white; address / label / notes red
+      box.innerHTML = rows
+        .map((w) => {
+          const score = String(w.risk_score != null ? w.risk_score : 0).padStart(3);
+          const times = "x" + (w.times_seen || 0);
+          const addr = escHtml(w.address || "");
+          const label = escHtml(w.label || "");
+          const notes = escHtml(String(w.notes || "").slice(0, 80));
+          return (
+            '<span class="w-nums">' +
+            escHtml(score) +
             "  " +
-            (w.address || "") +
+            escHtml(times) +
+            "</span>" +
+            '<span class="w-data">  ' +
+            addr +
             "\n     [" +
-            (w.label || "") +
+            label +
             "] " +
-            String(w.notes || "").slice(0, 80) +
-            "\n"
-        )
+            notes +
+            "\n</span>"
+          );
+        })
         .join("\n");
     } catch (e) {
       box.textContent = "Error: " + e.message;

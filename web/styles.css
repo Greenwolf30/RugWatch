@@ -239,11 +239,18 @@ body {
   overflow: auto;
   max-height: 60vh;
 }
-/* Wallets tab: all wallet list data in red */
+/* Wallets tab: left score/times white; address/label/notes red */
 #panel-wallets .box,
 #walletsBox {
   color: #ff4d4d;
   border-color: rgba(255, 77, 77, 0.35);
+}
+#walletsBox .w-nums {
+  color: #f0f2f5;
+  font-weight: 600;
+}
+#walletsBox .w-data {
+  color: #ff4d4d;
 }
 #panel-wallets .box a,
 #walletsBox a {
