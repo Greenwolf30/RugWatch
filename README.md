@@ -62,7 +62,8 @@ python -m rugwatch add-wallet <WALLET> --score 80 --notes "serial"
 # Clear all local data
 python -m rugwatch clear-db --yes
 
-# Export / import / cloud JSON — see EXTERNAL_STORAGE.md and RugCheck Documentation.md
+# Export / import / cloud JSON — see EXTERNAL_STORAGE.md (includes cloud capacity)
+# and RugCheck Documentation.md
 python -m rugwatch export-wallets -o wallets_export.json
 python -m rugwatch pull-remote
 python -m rugwatch push-cloud

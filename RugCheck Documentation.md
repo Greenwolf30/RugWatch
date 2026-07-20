@@ -352,6 +352,8 @@ Cloud must be set up for your account first. Failures appear in a dialog and the
 
 Use for: backup, second PC, or keeping one shared list you control.
 
+**Capacity:** there is no fixed “max wallets” in RugWatch. The cloud file is limited mainly by GitHub file size and speed — see [How many wallets is “too many”?](#how-many-wallets-is-too-many) and **EXTERNAL_STORAGE.md** (Cloud capacity).
+
 ---
 
 ### Pull cloud
@@ -718,6 +720,47 @@ For **disk alone**, a normal PC almost never fails from wallet count. Each row i
 4. **Actual Token Checker** — merges local + cloud on Analyze; huge lists = more matching work.
 
 **Practical advice:** Prefer a **curated** list (hundreds to a few thousand) over dumping everything. Quality of flags matters more than raw count. **Clear DB** frees **local** list space when you want a clean slate (export/push first if you still need the data).
+
+### Cloud capacity (`data/wallets_cloud.json`)
+
+RugWatch does **not** hard-cap how many wallets you can push. Capacity is limited by **one GitHub JSON file** and what stays practical for the website + ATC.
+
+#### Hard limits (GitHub)
+
+| Limit | Meaning |
+|--------|---------|
+| **~100 MB** | Hard max for a normal file in a GitHub repo |
+| **~1 MB** | Best zone for the Contents API used by Push/Pull cloud |
+| **No fixed wallet count** | Code does not stop at 1,000 / 10,000 / etc. |
+
+#### Rough size (with labels/notes like Ruggers exports)
+
+About **350–400 bytes per wallet** when notes are included.
+
+| File size | Approx. wallets |
+|-----------|------------------|
+| **1 MB** | ~2,500–3,000 |
+| **5 MB** | ~12,000–15,000 |
+| **10 MB** | ~25,000–30,000 |
+| **50 MB** | ~100,000+ (gets heavy) |
+| **100 MB** | theoretical max — not recommended |
+
+Address-only rows (short notes) fit **several times more**.
+
+#### Practical recommendation for cloud + ATC
+
+| Range | Guidance |
+|--------|----------|
+| **Thousands → ~10k–30k** | Comfortable: fast Push/Pull, fine for website + ATC on Render |
+| **~50k–100k+** | Still works, but slower loads and larger downloads |
+| **Huge multi‑MB list every push** | Risk of timeouts, slow ATC scans, API friction |
+
+**Effective target for RugWatch + ATC flags:** about **10,000–30,000 wallets** in the cloud file.  
+Hundreds of thousands are possible on GitHub but not ideal for speed.
+
+Local SQLite can hold more than you push; only what you **Push cloud** is what ATC reads via `RUGWATCH_WALLETS_URL`.
+
+More detail: **EXTERNAL_STORAGE.md** → *Cloud capacity (how many wallets)*.
 
 ---
 

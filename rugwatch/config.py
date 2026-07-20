@@ -58,7 +58,9 @@ def load_dotenv(path: Path | None = None) -> None:
                 key, _, val = line.partition("=")
                 key = key.strip()
                 val = val.strip().strip('"').strip("'")
-                if key and key not in os.environ:
+                # Always apply .env values; allow empty env vars / stale shells
+                # to be overridden so GITHUB_TOKEN etc. load correctly.
+                if key:
                     os.environ[key] = val
         except OSError:
             continue
