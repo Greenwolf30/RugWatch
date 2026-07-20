@@ -120,6 +120,52 @@
       .replace(/"/g, "&quot;");
   }
 
+  function forceCopyText(text) {
+    const t = String(text || "").trim();
+    if (!t) return false;
+    const ta = document.createElement("textarea");
+    ta.value = t;
+    ta.setAttribute("readonly", "");
+    ta.style.cssText =
+      "position:fixed;top:0;left:0;width:1px;height:1px;padding:0;border:none;opacity:0;";
+    document.body.appendChild(ta);
+    ta.focus();
+    ta.select();
+    try {
+      ta.setSelectionRange(0, t.length);
+    } catch (_) {}
+    let ok = false;
+    try {
+      ok = document.execCommand("copy");
+    } catch (_) {
+      ok = false;
+    }
+    document.body.removeChild(ta);
+    return ok;
+  }
+
+  function copyText(text, onOk) {
+    const t = String(text || "").trim();
+    if (!t) return;
+    const done = () => {
+      if (typeof onOk === "function") onOk();
+      log("Copied: " + t.slice(0, 12) + "…");
+    };
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard
+        .writeText(t)
+        .then(done)
+        .catch(() => {
+          if (forceCopyText(t)) done();
+          else window.prompt("Copy with Ctrl+C:", t);
+        });
+    } else if (forceCopyText(t)) {
+      done();
+    } else {
+      window.prompt("Copy with Ctrl+C:", t);
+    }
+  }
+
   async function refreshWallets() {
     const box = $("walletsBox");
     if (!box) return;
@@ -131,34 +177,71 @@
           "No wallets yet.\nUse Add wallet, or Upload manual wallets (next to Add wallet).\n";
         return;
       }
-      // Same layout as before; yellow scores, red wallet lines
+      // scores (yellow) · wallet (red) · mint (red, click to copy)
       box.innerHTML = rows
         .map((w) => {
           const score = String(w.risk_score != null ? w.risk_score : 0).padStart(3);
           const times = "x" + (w.times_seen || 0);
-          const addr = escHtml(w.address || "");
+          const wallet = String(w.address || "").trim();
+          const mint = String(w.mint || "").trim();
           const label = escHtml(w.label || "");
-          const notes = escHtml(String(w.notes || "").slice(0, 80));
+          const notes = escHtml(String(w.notes || "").slice(0, 60));
+          const mintBtn = mint
+            ? '<button type="button" class="w-mint" data-copy="' +
+              escHtml(mint) +
+              '" title="Left-click to copy mint">' +
+              escHtml(mint) +
+              "</button>"
+            : '<span class="w-mint-empty">—</span>';
           return (
-            '<div class="w-line">' +
+            '<div class="w-row">' +
             '<span class="w-nums">' +
             escHtml(score) +
             "  " +
             escHtml(times) +
             "</span>" +
-            '<span class="w-data">  ' +
-            addr +
-            "\n     [" +
+            '<span class="w-wallet">' +
+            escHtml(wallet) +
+            "</span>" +
+            '<span class="w-mint-wrap">' +
+            mintBtn +
+            "</span>" +
+            '<div class="w-meta">[' +
             label +
             "] " +
             notes +
-            "\n</span></div>"
+            "</div></div>"
           );
         })
-        .join("\n");
+        .join("");
     } catch (e) {
       box.textContent = "Error: " + e.message;
     }
+  }
+
+  function wireWalletMintCopy() {
+    const box = $("walletsBox");
+    if (!box || box.dataset.copyWired === "1") return;
+    box.dataset.copyWired = "1";
+    box.addEventListener("click", (ev) => {
+      const btn =
+        ev.target && ev.target.closest
+          ? ev.target.closest("button.w-mint")
+          : null;
+      if (!btn || !box.contains(btn)) return;
+      ev.preventDefault();
+      const text = (btn.getAttribute("data-copy") || btn.textContent || "").trim();
+      if (!text) return;
+      copyText(text, () => {
+        const prev = btn.textContent;
+        btn.classList.add("copied");
+        btn.textContent = "copied!";
+        setTimeout(() => {
+          btn.textContent = prev;
+          btn.classList.remove("copied");
+        }, 900);
+      });
+    });
   }
 
   function formatAlertWeb(a) {
@@ -420,127 +503,7 @@
       });
     }
     $("btnAdd").addEventListener("click", () => doAdd());
-
-    /** Reliable clipboard write (Windows browsers). */
-    function forceCopyText(text) {
-      const t = String(text || "");
-      if (!t) return false;
-      // 1) modern API
-      try {
-        if (navigator.clipboard && navigator.clipboard.writeText) {
-          // sync path: fire async; return "pending" via separate handlers below
-        }
-      } catch (_) {}
-      // 2) classic textarea + execCommand (works on most local HTTP pages)
-      const ta = document.createElement("textarea");
-      ta.value = t;
-      ta.setAttribute("readonly", "");
-      ta.style.cssText =
-        "position:fixed;top:0;left:0;width:1px;height:1px;padding:0;border:none;outline:none;opacity:0;";
-      document.body.appendChild(ta);
-      ta.focus();
-      ta.select();
-      try {
-        ta.setSelectionRange(0, t.length);
-      } catch (_) {}
-      let ok = false;
-      try {
-        ok = document.execCommand("copy");
-      } catch (_) {
-        ok = false;
-      }
-      document.body.removeChild(ta);
-      return ok;
-    }
-
-    function showMintCopyStatus(msg, ok) {
-      const st = $("mintCopyStatus");
-      if (st) {
-        st.hidden = false;
-        st.textContent = msg;
-        st.style.color = ok ? "#8ee4a8" : "#f07178";
-      }
-      try {
-        log(msg);
-      } catch (_) {}
-    }
-
-    function copyMintField() {
-      const mintEl = $("mintInput");
-      if (!mintEl) {
-        alert("Mint field not found on page.");
-        return;
-      }
-      const v = String(mintEl.value || "").trim();
-      if (!v) {
-        showMintCopyStatus("Mint field is empty — paste an address first.", false);
-        alert("Mint field is empty.\n\nPaste a mint address, then click Copy mint.");
-        return;
-      }
-
-      // Prefer async clipboard, fall back to execCommand, then prompt
-      const succeed = () => {
-        showMintCopyStatus("Copied: " + v.slice(0, 16) + "…", true);
-        const btn = $("btnCopyMint");
-        if (btn) {
-          const prev = btn.textContent;
-          btn.textContent = "Copied!";
-          setTimeout(() => {
-            btn.textContent = prev || "Copy mint";
-          }, 1200);
-        }
-      };
-      const failPrompt = () => {
-        showMintCopyStatus("Auto-copy failed — use Ctrl+C in the box below.", false);
-        window.prompt("Select the text and press Ctrl+C to copy:", v);
-      };
-
-      let usedAsync = false;
-      try {
-        if (navigator.clipboard && typeof navigator.clipboard.writeText === "function") {
-          usedAsync = true;
-          navigator.clipboard.writeText(v).then(succeed).catch(() => {
-            if (forceCopyText(v)) succeed();
-            else failPrompt();
-          });
-        }
-      } catch (_) {
-        usedAsync = false;
-      }
-      if (!usedAsync) {
-        if (forceCopyText(v)) succeed();
-        else failPrompt();
-      }
-    }
-
-    // Left-click mint field → copy when it already has a value
-    if ($("mintInput")) {
-      $("mintInput").addEventListener("dblclick", (ev) => {
-        ev.preventDefault();
-        copyMintField();
-      });
-      // Also copy on single click if field already has content (after a short delay)
-      $("mintInput").addEventListener("mouseup", (ev) => {
-        if (ev.button !== 0) return;
-        const v = String($("mintInput").value || "").trim();
-        if (!v) return;
-        // Only auto-copy if user is not selecting a range to edit
-        const el = $("mintInput");
-        const selLen =
-          typeof el.selectionEnd === "number" && typeof el.selectionStart === "number"
-            ? el.selectionEnd - el.selectionStart
-            : 0;
-        if (selLen > 0 && selLen < v.length) return;
-        copyMintField();
-      });
-    }
-    if ($("btnCopyMint")) {
-      $("btnCopyMint").addEventListener("click", (ev) => {
-        ev.preventDefault();
-        ev.stopPropagation();
-        copyMintField();
-      });
-    }
+    wireWalletMintCopy();
     // Upload manual wallets is next to Add wallet (no Upload tab)
     if ($("fileInput")) {
       $("fileInput").addEventListener("change", async (ev) => {

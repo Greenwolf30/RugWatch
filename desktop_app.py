@@ -211,7 +211,37 @@ def run_gui() -> None:
     log_box = make_text(tab_log)
     wallets_box = make_text(tab_wallets)
     wallets_box.tag_configure("w_nums", foreground="#c4a84a")
-    wallets_box.tag_configure("w_data", foreground="#c47a7a")
+    wallets_box.tag_configure("w_wallet", foreground="#c47a7a")
+    wallets_box.tag_configure("w_mint", foreground="#c47a7a", underline=True)
+    wallets_box.tag_configure("w_meta", foreground="#a86a6a")
+
+    def _on_wallet_mint_click(event: Any) -> str:
+        try:
+            idx = wallets_box.index(f"@{event.x},{event.y}")
+            ranges = wallets_box.tag_ranges("w_mint")
+            for i in range(0, len(ranges), 2):
+                start, end = ranges[i], ranges[i + 1]
+                if wallets_box.compare(start, "<=", idx) and wallets_box.compare(
+                    idx, "<", end
+                ):
+                    mint = wallets_box.get(start, end).strip()
+                    if mint and mint != "—":
+                        root.clipboard_clear()
+                        root.clipboard_append(mint)
+                        root.update_idletasks()
+                        log(f"Copied mint: {mint[:12]}…")
+                    break
+        except Exception:  # noqa: BLE001
+            pass
+        return "break"
+
+    wallets_box.tag_bind("w_mint", "<Button-1>", _on_wallet_mint_click)
+    wallets_box.tag_bind(
+        "w_mint", "<Enter>", lambda _e: wallets_box.config(cursor="hand2")
+    )
+    wallets_box.tag_bind(
+        "w_mint", "<Leave>", lambda _e: wallets_box.config(cursor="")
+    )
     alerts_box = make_text(tab_alerts)
 
     q: queue.Queue = queue.Queue()
@@ -264,6 +294,7 @@ def run_gui() -> None:
 
     def refresh_wallets() -> None:
         rows = db.list_wallets(min_score=0, limit=100)
+        mint_map = db.wallet_mint_map()
         wallets_box.delete("1.0", "end")
         if not rows:
             wallets_box.insert(
@@ -274,13 +305,22 @@ def run_gui() -> None:
             )
             return
         for w in rows:
-            nums = f"{w.get('risk_score'):3}  x{w.get('times_seen')}"
-            data = (
-                f"  {w.get('address')}\n"
-                f"     [{w.get('label') or ''}] {(w.get('notes') or '')[:80]}\n\n"
+            addr = str(w.get("address") or "").strip()
+            mint = (
+                mint_map.get(addr)
+                or RugWatchDB.mint_from_notes(w.get("notes"))
+                or "—"
             )
-            wallets_box.insert("end", nums, "w_nums")
-            wallets_box.insert("end", data, "w_data")
+            nums = f"{w.get('risk_score'):3}  x{w.get('times_seen')}"
+            wallets_box.insert("end", nums + "  ", "w_nums")
+            wallets_box.insert("end", addr or "(no wallet)", "w_wallet")
+            wallets_box.insert("end", "  ", "w_meta")
+            wallets_box.insert("end", mint, "w_mint")
+            wallets_box.insert(
+                "end",
+                f"\n     [{w.get('label') or ''}] {(w.get('notes') or '')[:80]}\n\n",
+                "w_meta",
+            )
 
     def refresh_alerts() -> None:
         rows = db.list_alerts(limit=50)
@@ -564,34 +604,6 @@ def run_gui() -> None:
         )
         refresh_all()
         refresh_cloud_count()
-
-    def copy_mint_field() -> None:
-        v = mint_var.get().strip()
-        if not v:
-            messagebox.showinfo(
-                __app_name__,
-                "Mint field is empty.\n\nPaste a mint address first, then click Copy mint.",
-            )
-            return
-        try:
-            root.clipboard_clear()
-            root.clipboard_append(v)
-            # Keep on clipboard after app loses focus (Windows)
-            try:
-                root.clipboard_get()
-            except tk.TclError:
-                root.clipboard_append(v)
-            root.update_idletasks()
-            log(f"Copied mint: {v[:16]}…")
-            messagebox.showinfo(__app_name__, f"Copied to clipboard:\n\n{v}")
-        except Exception as exc:  # noqa: BLE001
-            messagebox.showerror(__app_name__, f"Copy failed:\n{exc}\n\nMint:\n{v}")
-
-    # Ctrl+C while focused still works; button is the reliable path
-    ttk.Button(mint_row, text="Copy mint", command=copy_mint_field).pack(
-        side="left", padx=(0, 8)
-    )
-    mint_entry.bind("<Control-c>", lambda _e: (copy_mint_field(), "break")[1])
 
     ttk.Button(btn_row, text="Scan mint", style="Accent.TButton", command=do_scan).pack(
         side="left", padx=(0, 6)
