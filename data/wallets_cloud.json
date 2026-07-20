@@ -1,7 +1,56 @@
 {
   "format": "rugwatch_wallets_v1",
-  "wallets": [],
-  "count": 0,
+  "wallets": [
+    {
+      "address": "BvWccUPySc32KmSHztcTvsGBvfjbxN6nsqgngYwNXtgr",
+      "chain_id": "solana",
+      "label": "ruggers_similar_sellers",
+      "risk_score": 80,
+      "notes": "ruggers similar_sellers \u00b7 $PUCK \u00b7 mint E4heBtoxAu4fbPCiTNU773vHxRHFEUymXeKYXYkfpump \u00b7 100.0% sold of first bag \u00b7 not_listed",
+      "source": "adtc_ruggers_export"
+    },
+    {
+      "address": "FSHXkmt8TPdwE3Qe9xxpX7QFVfJC4YfdDsCzZmM2G2Wi",
+      "chain_id": "solana",
+      "label": "ruggers_similar_sellers",
+      "risk_score": 80,
+      "notes": "ruggers similar_sellers \u00b7 $PUCK \u00b7 mint E4heBtoxAu4fbPCiTNU773vHxRHFEUymXeKYXYkfpump \u00b7 100.0% sold of first bag \u00b7 not_listed",
+      "source": "adtc_ruggers_export"
+    },
+    {
+      "address": "FZ6fW6aaMm8ro2cGqZ2VfAmmsse1x3dwWpgqtcHF8gDC",
+      "chain_id": "solana",
+      "label": "ruggers_similar_sellers",
+      "risk_score": 80,
+      "notes": "ruggers similar_sellers \u00b7 $PUCK \u00b7 mint E4heBtoxAu4fbPCiTNU773vHxRHFEUymXeKYXYkfpump \u00b7 100.0% sold of first bag \u00b7 not_listed",
+      "source": "adtc_ruggers_export"
+    },
+    {
+      "address": "Fq9RDqJoEzvB62FDkbB9SLnDjzrXbUP57bkXvssNqRxC",
+      "chain_id": "solana",
+      "label": "ruggers_similar_sellers",
+      "risk_score": 80,
+      "notes": "ruggers similar_sellers \u00b7 $PUCK \u00b7 mint E4heBtoxAu4fbPCiTNU773vHxRHFEUymXeKYXYkfpump \u00b7 100.0% sold of first bag \u00b7 not_listed",
+      "source": "adtc_ruggers_export"
+    },
+    {
+      "address": "HfN9JFxwS89fERT8of2dt1it6G3P2ia5sJc5J8GkwU5k",
+      "chain_id": "solana",
+      "label": "ruggers_similar_sellers",
+      "risk_score": 80,
+      "notes": "ruggers similar_sellers \u00b7 $PUCK \u00b7 mint E4heBtoxAu4fbPCiTNU773vHxRHFEUymXeKYXYkfpump \u00b7 100.0% sold of first bag \u00b7 not_listed",
+      "source": "adtc_ruggers_export"
+    },
+    {
+      "address": "JBFLT9r8WHsNq2ycFwBj3nrj2YbAs2pLjYWXQTAC8WV2",
+      "chain_id": "solana",
+      "label": "ruggers_similar_sellers",
+      "risk_score": 80,
+      "notes": "ruggers similar_sellers \u00b7 $PUCK \u00b7 mint E4heBtoxAu4fbPCiTNU773vHxRHFEUymXeKYXYkfpump \u00b7 100.0% sold of first bag \u00b7 not_listed",
+      "source": "adtc_ruggers_export"
+    }
+  ],
+  "count": 6,
   "shard": 1,
   "total_shards": 1,
   "note": "RugWatch wallet list \u2014 cloud shard (same project on GitHub)"
