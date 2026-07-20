@@ -119,11 +119,7 @@ body {
   cursor: default;
   user-select: none;
 }
-.pill-wallets {
-  color: #ff4d4d;
-  border-color: rgba(255, 77, 77, 0.45);
-  background: rgba(255, 40, 40, 0.08);
-}
+.pill-wallets { color: var(--ok); }
 .pill-logged { color: var(--accent); }
 .pill-cloud { color: #7ec8e3; cursor: pointer; }
 .pill-cloud:hover { border-color: #7ec8e3; }

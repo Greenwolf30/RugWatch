@@ -102,7 +102,7 @@ def run_gui() -> None:
         lab.pack(side="left", padx=4)
         return lab
 
-    pill_now = _pill(pills, wallets_now_var, fg="#ff4d4d")
+    pill_now = _pill(pills, wallets_now_var, fg="#8ee4a8")
     pill_life = _pill(pills, wallets_life_var, fg=ACCENT)
     pill_cloud = _pill(pills, wallets_cloud_var, fg="#7ec8e3")
     pill_now.configure(cursor="hand2")
