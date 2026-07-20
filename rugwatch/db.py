@@ -348,6 +348,62 @@ class RugWatchDB:
             ).fetchone()
             return dict(row) if row else None
 
+    def delete_wallet(self, address: str) -> dict[str, Any]:
+        """
+        Remove a wallet from every local shard + mint links / alerts on primary.
+        Used when a flagged seller buys back (swing) and must be unflagged.
+        """
+        address = (address or "").strip()
+        out: dict[str, Any] = {
+            "address": address,
+            "deleted": False,
+            "links_removed": 0,
+            "alerts_removed": 0,
+        }
+        if not address:
+            return out
+        # Wallet row may live on any shard
+        for p in self.shard_paths():
+            try:
+                with self.session(p) as conn:
+                    cur = conn.execute(
+                        "DELETE FROM wallets WHERE address = ?", (address,)
+                    )
+                    if cur.rowcount and cur.rowcount > 0:
+                        out["deleted"] = True
+            except sqlite3.Error:
+                continue
+        # Links + alerts only on primary
+        try:
+            with self.session(self.path) as conn:
+                cur_l = conn.execute(
+                    "DELETE FROM wallet_mint_links WHERE wallet = ?", (address,)
+                )
+                out["links_removed"] = int(cur_l.rowcount or 0)
+                cur_a = conn.execute(
+                    "DELETE FROM alerts WHERE wallet = ?", (address,)
+                )
+                out["alerts_removed"] = int(cur_a.rowcount or 0)
+        except sqlite3.Error:
+            pass
+        return out
+
+    def delete_wallets(self, addresses: list[str]) -> dict[str, Any]:
+        """Delete many wallets; returns per-address results + totals."""
+        results: list[dict[str, Any]] = []
+        deleted_n = 0
+        for raw in addresses or []:
+            r = self.delete_wallet(str(raw or ""))
+            results.append(r)
+            if r.get("deleted"):
+                deleted_n += 1
+        return {
+            "ok": True,
+            "requested": len(results),
+            "deleted": deleted_n,
+            "results": results,
+        }
+
     def list_wallets(
         self, *, min_score: int = 0, limit: int = 200
     ) -> list[dict[str, Any]]:

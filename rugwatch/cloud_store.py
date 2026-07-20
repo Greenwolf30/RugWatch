@@ -794,6 +794,192 @@ def push_to_cloud(db: RugWatchDB | None = None) -> dict[str, Any]:
     return push_to_gist(db)
 
 
+def remove_addresses_from_cloud(
+    addresses: list[str],
+    db: RugWatchDB | None = None,
+) -> dict[str, Any]:
+    """
+    Explicit unflag: delete addresses from the cloud wallet list and rewrite shards.
+
+    Unlike Push (merge-only, never shrinks), this intentionally removes the given
+    addresses so a buy-back swing can leave the flagged/cloud list.
+    Local DB rows should already be deleted before calling this (or call after).
+    """
+    drop = {
+        (a or "").strip()
+        for a in (addresses or [])
+        if (a or "").strip()
+    }
+    if not drop:
+        return {"ok": False, "error": "No addresses to remove", "removed": 0}
+
+    mode = cloud_mode()
+    if mode == "off":
+        return {"ok": False, "error": "RUGWATCH_CLOUD=off", "removed": 0}
+    if not github_token():
+        return {
+            "ok": False,
+            "error": "Set GITHUB_TOKEN in .env",
+            "removed": 0,
+        }
+
+    if mode == "repo":
+        if not github_repo():
+            return {
+                "ok": False,
+                "error": "Set RUGWATCH_GITHUB_REPO",
+                "removed": 0,
+            }
+        try:
+            cloud_wallets, _meta = _load_all_cloud_wallets_repo()
+        except Exception as exc:  # noqa: BLE001
+            return {
+                "ok": False,
+                "error": f"Could not load cloud wallets: {exc}",
+                "removed": 0,
+            }
+        cloud_before = len(cloud_wallets)
+        kept: list[dict[str, Any]] = []
+        removed_n = 0
+        for w in cloud_wallets:
+            a = (w.get("address") or w.get("wallet") or "").strip()
+            if a in drop:
+                removed_n += 1
+                continue
+            kept.append(w)
+        if removed_n == 0:
+            return {
+                "ok": True,
+                "action": "remove",
+                "mode": "repo",
+                "removed": 0,
+                "cloud_before": cloud_before,
+                "wallet_count": cloud_before,
+                "note": "None of the addresses were on the cloud list.",
+            }
+        # Rewrite shards from remaining list (allowed to shrink)
+        max_n = config.cloud_shard_max()
+        chunks = _chunk_wallets(kept, max_n)
+        total_shards = len(chunks)
+        branch = github_branch()
+        repo = github_repo()
+        shard_meta: list[dict[str, Any]] = []
+        errors: list[str] = []
+        for i, chunk in enumerate(chunks, start=1):
+            path = _shard_file_path(i)
+            body = _payload_shard(chunk, shard=i, total_shards=total_shards)
+            try:
+                _put_repo_file(
+                    path,
+                    json.dumps(body, indent=2),
+                    message=(
+                        f"RugWatch: unflag remove {removed_n} wallet(s) "
+                        f"shard {i}/{total_shards} ({len(chunk)} left)"
+                    ),
+                )
+                shard_meta.append({"path": path, "count": len(chunk), "shard": i})
+            except Exception as exc:  # noqa: BLE001
+                errors.append(f"{path}: {exc}")
+        index_path = config.cloud_index_path()
+        index_body = {
+            "format": "rugwatch_wallets_index_v1",
+            "shard_max_wallets": max_n,
+            "shards": shard_meta,
+            "total_count": len(kept),
+            "updated_at": datetime.now(timezone.utc).isoformat(),
+            "note": (
+                "Multi-shard wallet index. Explicit unflag may remove addresses "
+                "when a flagged seller buys back (swing)."
+            ),
+        }
+        try:
+            _put_repo_file(
+                index_path,
+                json.dumps(index_body, indent=2),
+                message=(
+                    f"RugWatch: unflag index ({len(kept)} addresses after "
+                    f"removing {removed_n})"
+                ),
+            )
+        except Exception as exc:  # noqa: BLE001
+            errors.append(f"{index_path}: {exc}")
+        index_raw = f"https://raw.githubusercontent.com/{repo}/{branch}/{index_path}"
+        os.environ["RUGWATCH_WALLETS_URL"] = index_raw
+        return {
+            "ok": not errors,
+            "action": "remove",
+            "mode": "repo",
+            "removed": removed_n,
+            "cloud_before": cloud_before,
+            "wallet_count": len(kept),
+            "cloud_shards": total_shards,
+            "index_path": index_path,
+            "repo": repo,
+            "html_url": f"https://github.com/{repo}/blob/{branch}/{index_path}",
+            "raw_url": index_raw,
+            "errors": errors or None,
+            "note": (
+                f"Unflag remove: cloud {cloud_before} → {len(kept)} "
+                f"(-{removed_n})."
+            ),
+        }
+
+    # Gist mode
+    gid = gist_id()
+    fname = gist_filename()
+    if not gid:
+        return {
+            "ok": False,
+            "error": "Gist cloud not configured for unflag remove",
+            "removed": 0,
+        }
+    try:
+        data0 = _request_json("GET", f"{GIST_API}/{gid}")
+        files0 = data0.get("files") or {}
+        file_obj = files0.get(fname) if isinstance(files0, dict) else None
+        if not file_obj and isinstance(files0, dict) and files0:
+            file_obj = next(iter(files0.values()))
+        content0 = (file_obj or {}).get("content") if isinstance(file_obj, dict) else None
+        cloud: list[dict[str, Any]] = []
+        if content0:
+            cloud = parse_wallet_payload(json.loads(content0))
+        cloud_before = len(cloud)
+        kept = []
+        removed_n = 0
+        for w in cloud:
+            a = (w.get("address") or w.get("wallet") or "").strip()
+            if a in drop:
+                removed_n += 1
+                continue
+            kept.append(w)
+        body = {
+            "format": "rugwatch_wallets_v1",
+            "wallets": kept,
+            "count": len(kept),
+            "note": "RugWatch cloud after unflag remove",
+        }
+        _request_json(
+            "PATCH",
+            f"{GIST_API}/{gid}",
+            {
+                "files": {
+                    fname: {"content": json.dumps(body, indent=2)},
+                }
+            },
+        )
+        return {
+            "ok": True,
+            "action": "remove",
+            "mode": "gist",
+            "removed": removed_n,
+            "cloud_before": cloud_before,
+            "wallet_count": len(kept),
+            "note": f"Gist unflag: {cloud_before} → {len(kept)} (-{removed_n})",
+        }
+    except Exception as exc:  # noqa: BLE001
+        return {"ok": False, "error": str(exc), "removed": 0}
+
+
 def pull_from_cloud(
     db: RugWatchDB | None = None,
     *,

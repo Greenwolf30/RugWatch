@@ -16,6 +16,8 @@ from server-side .env and are never sent to the browser.
   POST /api/monitor      JSON: {} optional
   POST /api/push-cloud   JSON: {}
   POST /api/pull-cloud   JSON: {}
+  POST /api/unflag       JSON: {"addresses":[...], "push_cloud": true}
+                         Remove wallets from local DB + cloud (buy-back swing)
   POST /api/clear-db     JSON: {"confirm": true}
 
 Optional gate: set WEB_API_TOKEN in .env → require header X-API-Token.
@@ -619,6 +621,73 @@ class RugWatchHandler(BaseHTTPRequestHandler):
                 "note": result.get("note"),
             }
             self._json(200 if safe["ok"] else 400, sanitize_public(safe))
+            return
+
+        if path in ("/api/unflag", "/api/remove-wallets", "/api/wallets/remove"):
+            # Buy-back swing: drop wallet from local DB + GitHub cloud list
+            raw_addrs = body.get("addresses") or body.get("wallets") or []
+            if isinstance(raw_addrs, str):
+                raw_addrs = [raw_addrs]
+            if not raw_addrs and (body.get("address") or body.get("wallet")):
+                raw_addrs = [body.get("address") or body.get("wallet")]
+            addrs: list[str] = []
+            seen_a: set[str] = set()
+            for item in raw_addrs:
+                if isinstance(item, dict):
+                    a = (item.get("address") or item.get("wallet") or "").strip()
+                else:
+                    a = str(item or "").strip()
+                if a and len(a) >= 32 and a not in seen_a:
+                    seen_a.add(a)
+                    addrs.append(a)
+            if not addrs:
+                self._json(
+                    400,
+                    {"ok": False, "error": "addresses required", "removed_local": 0},
+                )
+                return
+            local = db.delete_wallets(addrs)
+            push_flag = body.get("push_cloud")
+            if push_flag is None:
+                push_flag = body.get("remove_cloud")
+            if push_flag is None:
+                want_cloud = True  # default: also scrub cloud
+            else:
+                want_cloud = push_flag is True or str(push_flag).strip().lower() in {
+                    "1",
+                    "true",
+                    "yes",
+                    "on",
+                }
+            cloud: dict[str, Any] | None = None
+            if want_cloud:
+                try:
+                    from rugwatch.cloud_store import remove_addresses_from_cloud
+
+                    cloud = remove_addresses_from_cloud(addrs, db)
+                except Exception as exc:  # noqa: BLE001
+                    cloud = {"ok": False, "error": str(exc), "removed": 0}
+            out = {
+                "ok": True,
+                "addresses": addrs,
+                "removed_local": int(local.get("deleted") or 0),
+                "local": sanitize_public(local),
+                "cloud": sanitize_public(cloud) if cloud else None,
+                "note": (
+                    "Unflagged on local DB"
+                    + (
+                        " and removed from cloud."
+                        if cloud and cloud.get("ok")
+                        else " (cloud remove skipped or failed)."
+                    )
+                ),
+            }
+            if cloud is not None and not cloud.get("ok"):
+                out["ok"] = bool(local.get("deleted") or 0) or bool(
+                    (cloud or {}).get("removed")
+                )
+                out["error"] = cloud.get("error")
+            self._json(200 if out.get("ok") else 400, sanitize_public(out))
             return
 
         if path == "/api/pull-cloud":
