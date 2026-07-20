@@ -45,8 +45,9 @@ python -m rugwatch pull-cloud
 ```
 
 Working store is the local multi-file database (`rugwatch.db` and overflow files).  
-**Push cloud** packs all local wallets into cloud files + `wallets_index.json`.  
-**Pull cloud** merges every listed cloud file into the local database.
+**Push cloud** **merges** local wallets **into** cloud (union by address).  
+**Cloud wallets are never erased** by Push or Pull — empty local cannot wipe GitHub.  
+**Pull cloud** merges every listed cloud file into the local database only (does not write cloud).
 
 ---
 

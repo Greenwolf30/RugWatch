@@ -194,6 +194,97 @@ def _chunk_wallets(wallets: list[dict[str, Any]], max_n: int) -> list[list[dict[
     return [wallets[i : i + max_n] for i in range(0, len(wallets), max_n)]
 
 
+def _merge_wallet_dicts(
+    *lists: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    """
+    Union wallets by address. Never drops an address that appears in any list.
+    On conflict, keep the higher risk_score (then longer notes).
+    """
+    by_addr: dict[str, dict[str, Any]] = {}
+    for wallets in lists:
+        for w in wallets or []:
+            if not isinstance(w, dict):
+                continue
+            a = (w.get("address") or w.get("wallet") or "").strip()
+            if not a or len(a) < 32:
+                continue
+            row = {
+                "address": a,
+                "chain_id": w.get("chain_id") or "solana",
+                "label": w.get("label") or "manual",
+                "risk_score": int(w.get("risk_score") or 0),
+                "notes": w.get("notes") or "",
+                "source": w.get("source") or "manual",
+            }
+            prev = by_addr.get(a)
+            if prev is None:
+                by_addr[a] = row
+                continue
+            # Prefer higher score; keep non-empty notes/labels
+            if int(row["risk_score"]) > int(prev.get("risk_score") or 0):
+                merged = dict(row)
+                if not merged.get("notes") and prev.get("notes"):
+                    merged["notes"] = prev["notes"]
+                if (not merged.get("label") or merged.get("label") == "manual") and prev.get(
+                    "label"
+                ):
+                    merged["label"] = prev["label"]
+                by_addr[a] = merged
+            else:
+                if row.get("notes") and not prev.get("notes"):
+                    prev["notes"] = row["notes"]
+                if row.get("label") and (
+                    not prev.get("label") or prev.get("label") == "manual"
+                ):
+                    prev["label"] = row["label"]
+                if int(row["risk_score"]) > int(prev.get("risk_score") or 0):
+                    prev["risk_score"] = row["risk_score"]
+    out = list(by_addr.values())
+    out.sort(key=lambda w: str(w.get("address") or ""))
+    return out
+
+
+def _load_all_cloud_wallets_repo() -> tuple[list[dict[str, Any]], dict[str, Any]]:
+    """
+    Read every cloud shard currently on GitHub.
+    Returns (wallets, meta). Raises on hard API failures (not mere missing files).
+    """
+    paths: list[str] = []
+    index_path = config.cloud_index_path()
+    index = _get_repo_file_json(index_path)
+    if isinstance(index, dict) and index.get("format") == "rugwatch_wallets_index_v1":
+        for s in index.get("shards") or []:
+            if isinstance(s, dict) and s.get("path"):
+                paths.append(str(s["path"]))
+        if not paths:
+            paths = [_shard_file_path(1)]
+    else:
+        paths = [github_wallets_path()]
+
+    all_items: list[dict[str, Any]] = []
+    loaded: list[str] = []
+    for path in paths:
+        parsed = _get_repo_file_json(path)
+        if parsed is None:
+            continue
+        items = parse_wallet_payload(parsed)
+        all_items.extend(items)
+        loaded.append(path)
+
+    wallets = _merge_wallet_dicts(all_items)
+    meta = {
+        "paths": loaded,
+        "cloud_before": len(wallets),
+        "index_total": (
+            int(index.get("total_count"))
+            if isinstance(index, dict) and isinstance(index.get("total_count"), int)
+            else None
+        ),
+    }
+    return wallets, meta
+
+
 # ── Repo mode (whole project on GitHub) ───────────────────────────────
 
 def _repo_contents_url(path: str | None = None) -> str:
@@ -261,25 +352,55 @@ def _get_repo_file_json(path: str) -> dict[str, Any] | None:
 
 def push_to_repo(db: RugWatchDB | None = None) -> dict[str, Any]:
     """
-    Export all local wallets and write one or more cloud JSON shards + index.
-    New shard files open automatically when RUGWATCH_CLOUD_SHARD_MAX is reached.
+    Merge local wallets INTO existing cloud wallets, then write shards + index.
+
+    Cloud wallets are never erased by Push:
+      - empty local DB cannot wipe cloud
+      - cloud addresses always survive; local only adds / upgrades scores
+    Pull never writes to cloud.
     """
     db = db or RugWatchDB()
-    wallets = db.export_wallets(min_score=0)
-    # Deduplicate by address (keep highest risk_score) — no duplicate cloud entries
-    by_addr: dict[str, dict[str, Any]] = {}
-    for w in wallets:
-        if not isinstance(w, dict):
-            continue
-        a = (w.get("address") or "").strip()
-        if not a:
-            continue
-        prev = by_addr.get(a)
-        if prev is None or int(w.get("risk_score") or 0) >= int(prev.get("risk_score") or 0):
-            by_addr[a] = w
-    wallets = list(by_addr.values())
-    # Stable order so re-push packs deterministically
-    wallets.sort(key=lambda w: str(w.get("address") or ""))
+    local = db.export_wallets(min_score=0)
+    local_n = len(local)
+
+    # Must load existing cloud first — if this fails, abort (do not push local-only empty wipe)
+    try:
+        cloud_wallets, cloud_meta = _load_all_cloud_wallets_repo()
+    except Exception as exc:  # noqa: BLE001
+        return {
+            "ok": False,
+            "error": (
+                "Could not load existing cloud wallets; push aborted so the cloud "
+                f"list cannot be erased. ({exc})"
+            ),
+            "mode": "repo",
+            "local_count": local_n,
+        }
+
+    cloud_before = len(cloud_wallets)
+    # Union: cloud ∪ local — addresses only grow (or stay)
+    wallets = _merge_wallet_dicts(cloud_wallets, local)
+    merged_n = len(wallets)
+
+    # Hard safety: never write fewer addresses than were already in cloud
+    if cloud_before > 0 and merged_n < cloud_before:
+        return {
+            "ok": False,
+            "error": (
+                f"Push blocked: merge would shrink cloud from {cloud_before} to "
+                f"{merged_n} wallets. Cloud is never reduced."
+            ),
+            "mode": "repo",
+            "cloud_before": cloud_before,
+            "merged": merged_n,
+        }
+
+    # Empty local + empty cloud: allow writing empty bootstrap once
+    # Empty local + non-empty cloud: merge keeps cloud (no wipe)
+    if cloud_before > 0 and local_n == 0:
+        # Still rewrite merged (= cloud) so index stays consistent; never clears
+        pass
+
     max_n = config.cloud_shard_max()
     chunks = _chunk_wallets(wallets, max_n)
     total_shards = len(chunks)
@@ -296,7 +417,10 @@ def push_to_repo(db: RugWatchDB | None = None) -> dict[str, Any]:
             r = _put_repo_file(
                 path,
                 json.dumps(body, indent=2),
-                message=f"RugWatch: sync wallet shard {i}/{total_shards} ({len(chunk)} addresses)",
+                message=(
+                    f"RugWatch: merge cloud shard {i}/{total_shards} "
+                    f"({len(chunk)} addresses, cloud never shrinks)"
+                ),
             )
             results.append(r)
             shard_meta.append({"path": path, "count": len(chunk), "shard": i})
@@ -312,14 +436,18 @@ def push_to_repo(db: RugWatchDB | None = None) -> dict[str, Any]:
         "updated_at": datetime.now(timezone.utc).isoformat(),
         "note": (
             "Multi-shard wallet index. ATC/readers should load every path in shards[]. "
-            "Each file is rugwatch_wallets_v1."
+            "Each file is rugwatch_wallets_v1. Push merges local into cloud; "
+            "cloud addresses are never removed."
         ),
     }
     try:
         idx_r = _put_repo_file(
             index_path,
             json.dumps(index_body, indent=2),
-            message=f"RugWatch: wallet index ({len(wallets)} addresses, {total_shards} shards)",
+            message=(
+                f"RugWatch: wallet index ({len(wallets)} addresses, "
+                f"{total_shards} shards, merge-only)"
+            ),
         )
         results.append(idx_r)
     except Exception as exc:  # noqa: BLE001
@@ -330,10 +458,11 @@ def push_to_repo(db: RugWatchDB | None = None) -> dict[str, Any]:
     primary_raw = f"https://raw.githubusercontent.com/{repo}/{branch}/{_shard_file_path(1)}"
     os.environ["RUGWATCH_WALLETS_URL"] = index_raw
 
+    added = max(0, merged_n - cloud_before)
     ok = not errors and bool(shard_meta)
     return {
         "ok": ok or (bool(shard_meta) and not errors),
-        "action": "updated",
+        "action": "merged",
         "mode": "repo",
         "repo": repo,
         "path": _shard_file_path(1),
@@ -343,12 +472,17 @@ def push_to_repo(db: RugWatchDB | None = None) -> dict[str, Any]:
         "raw_url": index_raw,
         "primary_raw_url": primary_raw,
         "wallet_count": len(wallets),
+        "cloud_before": cloud_before,
+        "local_count": local_n,
+        "added_from_local": added,
         "cloud_shards": total_shards,
         "shard_paths": [s["path"] for s in shard_meta],
         "errors": errors or None,
         "note": (
-            f"Wallets stored in {total_shards} shard file(s) under the RugWatch repo "
-            f"(max {max_n}/file). Index: {index_path}."
+            f"Merge-only push: cloud had {cloud_before}, local {local_n}, "
+            f"result {merged_n} (+{added} new). "
+            f"Stored in {total_shards} shard file(s) (max {max_n}/file). "
+            "Cloud wallets are never erased by Push or Pull."
         ),
     }
 
@@ -477,12 +611,67 @@ def _save_env_key(key: str, value: str) -> None:
 
 
 def push_to_gist(db: RugWatchDB | None = None) -> dict[str, Any]:
+    """Merge local into existing Gist wallets — never shrink/erase the Gist list."""
     db = db or RugWatchDB()
-    body = _payload_from_db(db)
-    content = json.dumps(body, indent=2)
-    fname = gist_filename()
+    local = db.export_wallets(min_score=0)
+    cloud: list[dict[str, Any]] = []
     gid = gist_id()
-    description = "RugWatch wallets (legacy Gist store)"
+    fname = gist_filename()
+
+    if gid:
+        try:
+            data0 = _request_json("GET", f"{GIST_API}/{gid}")
+            files0 = data0.get("files") or {}
+            file_obj = files0.get(fname) if isinstance(files0, dict) else None
+            if not file_obj and isinstance(files0, dict) and files0:
+                file_obj = next(iter(files0.values()))
+            content0 = (file_obj or {}).get("content") if isinstance(file_obj, dict) else None
+            if content0:
+                cloud = parse_wallet_payload(json.loads(content0))
+            elif isinstance(file_obj, dict) and file_obj.get("raw_url"):
+                from .remote_wallets import fetch_wallets_from_url
+
+                cloud = fetch_wallets_from_url(str(file_obj["raw_url"]))
+        except Exception as exc:  # noqa: BLE001
+            if not local:
+                return {
+                    "ok": False,
+                    "error": (
+                        "Could not load existing Gist wallets; push aborted to avoid erase. "
+                        f"({exc})"
+                    ),
+                    "mode": "gist",
+                }
+            # Local has data but cloud unread — still refuse erase of unknown cloud
+            return {
+                "ok": False,
+                "error": (
+                    "Could not load existing Gist wallets; push aborted so cloud cannot "
+                    f"be erased. ({exc})"
+                ),
+                "mode": "gist",
+            }
+
+    cloud_before = len(_merge_wallet_dicts(cloud))
+    wallets = _merge_wallet_dicts(cloud, local)
+    if cloud_before > 0 and len(wallets) < cloud_before:
+        return {
+            "ok": False,
+            "error": (
+                f"Push blocked: merge would shrink Gist from {cloud_before} to "
+                f"{len(wallets)}. Cloud is never reduced."
+            ),
+            "mode": "gist",
+        }
+
+    body = {
+        "format": "rugwatch_wallets_v1",
+        "wallets": wallets,
+        "count": len(wallets),
+        "note": "RugWatch wallets (legacy Gist) — merge-only, never shrinks",
+    }
+    content = json.dumps(body, indent=2)
+    description = "RugWatch wallets (legacy Gist store, merge-only)"
 
     if gid:
         data = _request_json(
@@ -490,7 +679,7 @@ def push_to_gist(db: RugWatchDB | None = None) -> dict[str, Any]:
             f"{GIST_API}/{gid}",
             {"description": description, "files": {fname: {"content": content}}},
         )
-        action = "updated"
+        action = "merged"
     else:
         data = _request_json(
             "POST",
@@ -521,8 +710,14 @@ def push_to_gist(db: RugWatchDB | None = None) -> dict[str, Any]:
         "gist_id": gid or data.get("id"),
         "html_url": data.get("html_url"),
         "raw_url": raw_url,
-        "wallet_count": body["count"],
-        "note": "Legacy separate Gist. Prefer RUGWATCH_CLOUD=repo so wallets live in the same folder/repo.",
+        "wallet_count": len(wallets),
+        "cloud_before": cloud_before,
+        "local_count": len(local),
+        "note": (
+            f"Merge-only Gist push: cloud had {cloud_before}, local {len(local)}, "
+            f"result {len(wallets)}. Cloud never shrinks. "
+            "Prefer RUGWATCH_CLOUD=repo so wallets live in the same folder/repo."
+        ),
     }
 
 
@@ -659,22 +854,49 @@ def ensure_cloud_cache(db: RugWatchDB | None = None) -> dict[str, Any]:
             "storage": "local_only",
         }
 
-    # Prefer pull; if file missing, push creates it in the same repo
+    # Prefer pull. Only bootstrap-push when local has wallets (never push empty wipe).
+    # Push is merge-only: cloud addresses are never erased.
     try:
         r = pull_from_cloud(db)
-        if r.get("ok") and (r.get("imported") or 0) == 0 and mode == "repo":
-            # ensure file exists in repo
+        local_n = int((db.stats() or {}).get("wallets") or 0)
+        if (
+            r.get("ok")
+            and (r.get("imported") or 0) == 0
+            and mode == "repo"
+            and local_n > 0
+        ):
+            # Seed cloud from local if cloud files were missing / empty of new rows
             try:
                 pr = push_to_cloud(db)
                 r["bootstrap_push"] = pr
             except Exception as exc:  # noqa: BLE001
                 r["bootstrap_push"] = {"ok": False, "error": str(exc)}
+        elif r.get("ok") and local_n == 0:
+            r["bootstrap_push"] = {
+                "ok": True,
+                "skipped": True,
+                "note": "Skipped bootstrap push: local DB empty (cloud never wiped).",
+            }
         r["storage"] = "github_repo" if mode == "repo" else "gist"
         r["primary"] = cloud_primary()
         r["local_cache"] = str(db.path)
         return r
     except Exception as exc:  # noqa: BLE001
-        # try create
+        # Only create cloud from local if we actually have wallets
+        local_n = 0
+        try:
+            local_n = int((db.stats() or {}).get("wallets") or 0)
+        except Exception:  # noqa: BLE001
+            local_n = 0
+        if local_n <= 0:
+            return {
+                "ok": False,
+                "error": (
+                    f"Cloud pull failed and local DB is empty — not pushing "
+                    f"(would risk empty cloud). ({exc})"
+                ),
+                "storage": mode,
+            }
         try:
             pr = push_to_cloud(db)
             pr["storage"] = "github_repo" if mode == "repo" else "gist"
