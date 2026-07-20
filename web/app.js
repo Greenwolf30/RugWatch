@@ -293,7 +293,9 @@
       log(
         "Push cloud OK · wallets=" +
           (data.wallet_count ?? "?") +
+          (data.cloud_shards != null ? " · cloud_shards=" + data.cloud_shards : "") +
           (data.path ? " · " + data.path : "") +
+          (data.index_path ? " · index=" + data.index_path : "") +
           (data.html_url ? " · " + data.html_url : "")
       );
       await refreshAll();
@@ -312,6 +314,8 @@
           (data.imported ?? 0) +
           " · db_wallets=" +
           (data.db_wallets ?? "?") +
+          (data.cloud_shards != null ? " · cloud_shards=" + data.cloud_shards : "") +
+          (data.local_shards != null ? " · local_shards=" + data.local_shards : "") +
           (data.note ? " · " + data.note : "")
       );
       await refreshAll();

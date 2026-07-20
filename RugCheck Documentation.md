@@ -352,7 +352,7 @@ Cloud must be set up for your account first. Failures appear in a dialog and the
 
 Use for: backup, second PC, or keeping one shared list you control.
 
-**Capacity:** there is no fixed “max wallets” in RugWatch. The cloud file is limited mainly by GitHub file size and speed — see [How many wallets is “too many”?](#how-many-wallets-is-too-many) and **EXTERNAL_STORAGE.md** (Cloud capacity).
+**Capacity / auto-shard:** default **100,000 wallets per cloud file** and **per local DB**. When full, RugWatch creates the next file automatically (`wallets_cloud_002.json`, `rugwatch_002.db`, …). Push/Pull uses **all** shards via `data/wallets_index.json`. See [How many wallets is “too many”?](#how-many-wallets-is-too-many) and **EXTERNAL_STORAGE.md**.
 
 ---
 
@@ -721,9 +721,20 @@ For **disk alone**, a normal PC almost never fails from wallet count. Each row i
 
 **Practical advice:** Prefer a **curated** list (hundreds to a few thousand) over dumping everything. Quality of flags matters more than raw count. **Clear DB** frees **local** list space when you want a clean slate (export/push first if you still need the data).
 
-### Cloud capacity (`data/wallets_cloud.json`)
+### Cloud capacity + auto-sharding
 
-RugWatch does **not** hard-cap how many wallets you can push. Capacity is limited by **one GitHub JSON file** and what stays practical for the website + ATC.
+RugWatch does **not** hard-cap the **total** wallets you can store. When one file fills up, it **opens another**:
+
+| | Default max per file | Next file name |
+|--|----------------------|----------------|
+| Cloud | `RUGWATCH_CLOUD_SHARD_MAX=100000` | `wallets_cloud_002.json`, `_003`, … + `wallets_index.json` |
+| Local | `RUGWATCH_LOCAL_DB_MAX=100000` | `rugwatch_002.db`, `_003`, … |
+
+**Push cloud** packs every local wallet into shards and updates the index.  
+**Pull cloud** merges **every** cloud shard into local DBs.  
+Pills show **combined totals** across all shards.
+
+Per-file practical size (GitHub / ATC speed) still applies to each shard:
 
 #### Hard limits (GitHub)
 

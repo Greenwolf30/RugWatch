@@ -6,13 +6,16 @@ Primary mode (recommended): same GitHub REPO as the code
   RUGWATCH_GITHUB_REPO=YourUser/RugWatch
   GITHUB_TOKEN=ghp_...   (repo scope: contents read/write)
   RUGWATCH_GITHUB_PATH=data/wallets_cloud.json
+  RUGWATCH_CLOUD_SHARD_MAX=100000   # new JSON file after this many wallets
+  RUGWATCH_CLOUD_INDEX=data/wallets_index.json
 
-Legacy mode: separate Gist
+When a shard fills, Push cloud creates wallets_cloud_002.json, _003, ...
+and updates wallets_index.json. Pull cloud merges every listed shard.
+
+Legacy mode: separate Gist (single file, not multi-sharded)
   RUGWATCH_CLOUD=gist
-  GITHUB_TOKEN=... (gist scope)
-  RUGWATCH_GIST_ID=...
 
-Local data/rugwatch.db is only a cache so the desktop app runs offline-ish.
+Local multi-DB: data/rugwatch.db + rugwatch_002.db when RUGWATCH_LOCAL_DB_MAX hit.
 """
 
 from __future__ import annotations
@@ -22,6 +25,7 @@ import json
 import os
 import urllib.error
 import urllib.request
+from datetime import datetime, timezone
 from typing import Any
 
 from . import config
@@ -159,14 +163,35 @@ def _request_json(
         raise RuntimeError(f"GitHub API {exc.code}: {body}") from exc
 
 
-def _payload_from_db(db: RugWatchDB) -> dict[str, Any]:
-    wallets = db.export_wallets(min_score=0)
+def _payload_shard(wallets: list[dict[str, Any]], *, shard: int, total_shards: int) -> dict[str, Any]:
     return {
         "format": "rugwatch_wallets_v1",
         "wallets": wallets,
         "count": len(wallets),
-        "note": "RugWatch wallet list — primary cloud store (same project on GitHub)",
+        "shard": shard,
+        "total_shards": total_shards,
+        "note": "RugWatch wallet list — cloud shard (same project on GitHub)",
     }
+
+
+def _shard_file_path(index: int) -> str:
+    """1-based shard index → repo path. Shard 1 keeps the classic filename."""
+    base = github_wallets_path()
+    if index <= 1:
+        return base
+    # data/wallets_cloud.json → data/wallets_cloud_002.json
+    if base.lower().endswith(".json"):
+        stem = base[: -len(".json")]
+        return f"{stem}_{index:03d}.json"
+    return f"{base}_{index:03d}"
+
+
+def _chunk_wallets(wallets: list[dict[str, Any]], max_n: int) -> list[list[dict[str, Any]]]:
+    if max_n < 1:
+        max_n = 100_000
+    if not wallets:
+        return [[]]
+    return [wallets[i : i + max_n] for i in range(0, len(wallets), max_n)]
 
 
 # ── Repo mode (whole project on GitHub) ───────────────────────────────
@@ -181,15 +206,16 @@ def _repo_contents_url(path: str | None = None) -> str:
     return f"{REPO_API}/{repo}/contents/{p}"
 
 
-def push_to_repo(db: RugWatchDB | None = None) -> dict[str, Any]:
-    db = db or RugWatchDB()
-    body = _payload_from_db(db)
-    content = json.dumps(body, indent=2)
-    b64 = base64.b64encode(content.encode("utf-8")).decode("ascii")
-    path = github_wallets_path()
+def _put_repo_file(
+    path: str,
+    content_text: str,
+    *,
+    message: str,
+) -> dict[str, Any]:
+    """Create or update a single file in the GitHub repo. Returns API result summary."""
+    b64 = base64.b64encode(content_text.encode("utf-8")).decode("ascii")
     url = _repo_contents_url(path)
     branch = github_branch()
-
     sha = None
     try:
         existing = _request_json("GET", f"{url}?ref={branch}")
@@ -198,71 +224,184 @@ def push_to_repo(db: RugWatchDB | None = None) -> dict[str, Any]:
     except RuntimeError as exc:
         if "404" not in str(exc):
             raise
-
     payload: dict[str, Any] = {
-        "message": f"RugWatch: sync wallets ({body['count']} addresses)",
+        "message": message,
         "content": b64,
         "branch": branch,
     }
     if sha:
         payload["sha"] = sha
-
     data = _request_json("PUT", url, payload)
     html = (data.get("content") or {}).get("html_url") or data.get("commit", {}).get("html_url")
-    raw = (
-        f"https://raw.githubusercontent.com/{github_repo()}/{branch}/{path}"
-    )
-    os.environ["RUGWATCH_WALLETS_URL"] = raw
-
     return {
         "ok": True,
         "action": "updated" if sha else "created",
-        "mode": "repo",
-        "repo": github_repo(),
         "path": path,
-        "branch": branch,
         "html_url": html,
-        "raw_url": raw,
-        "wallet_count": body["count"],
-        "note": "Wallets stored IN the same GitHub repo as RugWatch (not a separate Gist).",
+        "sha": (data.get("content") or {}).get("sha"),
     }
 
 
-def pull_from_repo(db: RugWatchDB | None = None) -> dict[str, Any]:
-    db = db or RugWatchDB()
-    path = github_wallets_path()
+def _get_repo_file_json(path: str) -> dict[str, Any] | None:
+    """Return parsed JSON for a repo file, or None if 404."""
     url = _repo_contents_url(path)
     branch = github_branch()
     try:
         data = _request_json("GET", f"{url}?ref={branch}")
     except RuntimeError as exc:
         if "404" in str(exc):
-            return {
-                "ok": True,
-                "mode": "repo",
-                "imported": 0,
-                "note": f"No {path} in repo yet — add a wallet and push, or run push-cloud.",
-                "repo": github_repo(),
-            }
+            return None
         raise
-
     content_b64 = data.get("content") or ""
     if not content_b64:
-        return {"ok": False, "error": "Empty file content from GitHub"}
-    # GitHub may wrap base64 with newlines
+        return None
     raw = base64.b64decode(content_b64.replace("\n", "")).decode("utf-8")
-    parsed = json.loads(raw)
-    items = parse_wallet_payload(parsed)
-    stats = db.import_wallets(items, source_default="cloud_repo")
+    return json.loads(raw)
+
+
+def push_to_repo(db: RugWatchDB | None = None) -> dict[str, Any]:
+    """
+    Export all local wallets and write one or more cloud JSON shards + index.
+    New shard files open automatically when RUGWATCH_CLOUD_SHARD_MAX is reached.
+    """
+    db = db or RugWatchDB()
+    wallets = db.export_wallets(min_score=0)
+    # Stable order so re-push packs deterministically
+    wallets.sort(key=lambda w: str(w.get("address") or ""))
+    max_n = config.cloud_shard_max()
+    chunks = _chunk_wallets(wallets, max_n)
+    total_shards = len(chunks)
+    branch = github_branch()
+    repo = github_repo()
+    shard_meta: list[dict[str, Any]] = []
+    results: list[dict[str, Any]] = []
+    errors: list[str] = []
+
+    for i, chunk in enumerate(chunks, start=1):
+        path = _shard_file_path(i)
+        body = _payload_shard(chunk, shard=i, total_shards=total_shards)
+        try:
+            r = _put_repo_file(
+                path,
+                json.dumps(body, indent=2),
+                message=f"RugWatch: sync wallet shard {i}/{total_shards} ({len(chunk)} addresses)",
+            )
+            results.append(r)
+            shard_meta.append({"path": path, "count": len(chunk), "shard": i})
+        except Exception as exc:  # noqa: BLE001
+            errors.append(f"{path}: {exc}")
+
+    index_path = config.cloud_index_path()
+    index_body = {
+        "format": "rugwatch_wallets_index_v1",
+        "shard_max_wallets": max_n,
+        "shards": shard_meta,
+        "total_count": len(wallets),
+        "updated_at": datetime.now(timezone.utc).isoformat(),
+        "note": (
+            "Multi-shard wallet index. ATC/readers should load every path in shards[]. "
+            "Each file is rugwatch_wallets_v1."
+        ),
+    }
+    try:
+        idx_r = _put_repo_file(
+            index_path,
+            json.dumps(index_body, indent=2),
+            message=f"RugWatch: wallet index ({len(wallets)} addresses, {total_shards} shards)",
+        )
+        results.append(idx_r)
+    except Exception as exc:  # noqa: BLE001
+        errors.append(f"{index_path}: {exc}")
+
+    # Prefer index URL for multi-shard consumers
+    index_raw = f"https://raw.githubusercontent.com/{repo}/{branch}/{index_path}"
+    primary_raw = f"https://raw.githubusercontent.com/{repo}/{branch}/{_shard_file_path(1)}"
+    os.environ["RUGWATCH_WALLETS_URL"] = index_raw
+
+    ok = not errors and bool(shard_meta)
+    return {
+        "ok": ok or (bool(shard_meta) and not errors),
+        "action": "updated",
+        "mode": "repo",
+        "repo": repo,
+        "path": _shard_file_path(1),
+        "index_path": index_path,
+        "branch": branch,
+        "html_url": f"https://github.com/{repo}/blob/{branch}/{index_path}",
+        "raw_url": index_raw,
+        "primary_raw_url": primary_raw,
+        "wallet_count": len(wallets),
+        "cloud_shards": total_shards,
+        "shard_paths": [s["path"] for s in shard_meta],
+        "errors": errors or None,
+        "note": (
+            f"Wallets stored in {total_shards} shard file(s) under the RugWatch repo "
+            f"(max {max_n}/file). Index: {index_path}."
+        ),
+    }
+
+
+def pull_from_repo(db: RugWatchDB | None = None) -> dict[str, Any]:
+    """
+    Pull all cloud shards (via index when present) into the local multi-DB.
+    Falls back to a single wallets_cloud.json if no index exists.
+    """
+    db = db or RugWatchDB()
+    index_path = config.cloud_index_path()
+    paths: list[str] = []
+    index = _get_repo_file_json(index_path)
+    if isinstance(index, dict) and index.get("format") == "rugwatch_wallets_index_v1":
+        for s in index.get("shards") or []:
+            if isinstance(s, dict) and s.get("path"):
+                paths.append(str(s["path"]))
+        if not paths:
+            paths = [_shard_file_path(1)]
+    else:
+        # Backward compatible: only primary file
+        paths = [github_wallets_path()]
+
+    total_imported = 0
+    total_skipped = 0
+    loaded_paths: list[str] = []
+    missing: list[str] = []
+
+    for path in paths:
+        parsed = _get_repo_file_json(path)
+        if parsed is None:
+            missing.append(path)
+            continue
+        items = parse_wallet_payload(parsed)
+        stats = db.import_wallets(items, source_default="cloud_repo")
+        total_imported += int(stats.get("imported") or 0)
+        total_skipped += int(stats.get("skipped") or 0)
+        loaded_paths.append(path)
+
+    if not loaded_paths and missing:
+        return {
+            "ok": True,
+            "mode": "repo",
+            "imported": 0,
+            "note": (
+                f"No cloud wallet files yet ({', '.join(missing[:3])}). "
+                "Add wallets and Push cloud."
+            ),
+            "repo": github_repo(),
+            "cloud_shards": 0,
+        }
+
     return {
         "ok": True,
         "mode": "repo",
         "source": "github_repo",
         "repo": github_repo(),
-        "path": path,
-        "imported": stats["imported"],
-        "skipped": stats["skipped"],
+        "path": loaded_paths[0] if loaded_paths else github_wallets_path(),
+        "paths": loaded_paths,
+        "imported": total_imported,
+        "skipped": total_skipped,
         "db_wallets": db.stats().get("wallets"),
+        "cloud_shards": len(loaded_paths),
+        "missing": missing or None,
+        "local_shards": db.stats().get("local_shards"),
     }
 
 
@@ -502,9 +641,14 @@ def cloud_status() -> dict[str, Any]:
         "gist_id": gist_id() if mode == "gist" else None,
         "wallets_url": config.wallets_remote_url(),
         "storage": storage,
+        "cloud_shard_max": config.cloud_shard_max() if mode == "repo" else None,
+        "cloud_index": config.cloud_index_path() if mode == "repo" else None,
+        "local_db_max": config.local_db_max(),
         "note": (
             "Whole RugWatch folder on GitHub = one place. "
-            "Wallets file lives inside that repo at data/wallets_cloud.json"
+            "Wallets live in data/wallets_cloud.json (+ _002…) with data/wallets_index.json. "
+            f"Auto-shard at {config.cloud_shard_max()} wallets/file; "
+            f"local DB auto-shard at {config.local_db_max()} wallets/file."
             if mode == "repo"
             else "Gist is a separate cloud object; use mode=repo to keep everything together."
         ),
@@ -513,7 +657,7 @@ def cloud_status() -> dict[str, Any]:
 
 def fetch_cloud_wallet_count() -> dict[str, Any]:
     """
-    Count wallets currently stored in the cloud file (repo or gist).
+    Count wallets currently stored in the cloud (sum of all shards when indexed).
     Does NOT import into the local DB — read-only count for the UI pill.
     """
     mode = cloud_mode()
@@ -538,39 +682,44 @@ def fetch_cloud_wallet_count() -> dict[str, Any]:
                     "error": "need GITHUB_TOKEN + RUGWATCH_GITHUB_REPO",
                     "storage": "local_only",
                 }
+            index_path = config.cloud_index_path()
+            index = _get_repo_file_json(index_path)
+            if isinstance(index, dict) and index.get("format") == "rugwatch_wallets_index_v1":
+                total = index.get("total_count")
+                shards = index.get("shards") or []
+                if not isinstance(total, int):
+                    total = 0
+                    for s in shards:
+                        if isinstance(s, dict):
+                            total += int(s.get("count") or 0)
+                return {
+                    "ok": True,
+                    "count": int(total),
+                    "cloud_shards": len(shards),
+                    "storage": f"github_repo:{github_repo()}/{index_path}",
+                    "mode": "repo",
+                    "index": True,
+                }
+
             path = github_wallets_path()
-            url = _repo_contents_url(path)
-            branch = github_branch()
-            try:
-                data = _request_json("GET", f"{url}?ref={branch}")
-            except RuntimeError as exc:
-                if "404" in str(exc):
-                    return {
-                        "ok": True,
-                        "count": 0,
-                        "storage": f"github_repo:{github_repo()}/{path}",
-                        "note": "cloud file not created yet",
-                    }
-                raise
-            content_b64 = data.get("content") or ""
-            if not content_b64:
-                return {"ok": True, "count": 0, "storage": f"github_repo:{github_repo()}/{path}"}
-            raw = base64.b64decode(content_b64.replace("\n", "")).decode("utf-8")
-            parsed = json.loads(raw)
+            parsed = _get_repo_file_json(path)
+            if parsed is None:
+                return {
+                    "ok": True,
+                    "count": 0,
+                    "cloud_shards": 0,
+                    "storage": f"github_repo:{github_repo()}/{path}",
+                    "note": "cloud file not created yet",
+                }
             items = parse_wallet_payload(parsed)
-            # Prefer explicit count field when present and matches list shape
+            n = len(items)
             if isinstance(parsed, dict) and isinstance(parsed.get("count"), int):
-                n = int(parsed["count"])
-                if n >= len(items):
-                    return {
-                        "ok": True,
-                        "count": n,
-                        "storage": f"github_repo:{github_repo()}/{path}",
-                        "mode": "repo",
-                    }
+                if int(parsed["count"]) >= n:
+                    n = int(parsed["count"])
             return {
                 "ok": True,
-                "count": len(items),
+                "count": n,
+                "cloud_shards": 1,
                 "storage": f"github_repo:{github_repo()}/{path}",
                 "mode": "repo",
             }

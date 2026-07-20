@@ -9,29 +9,116 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Iterator
 
-from .config import db_path
+from .config import db_path, local_db_max
 
 
 def utc_now() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
+_WALLET_SCHEMA_SQL = """
+CREATE TABLE IF NOT EXISTS wallets (
+    address       TEXT PRIMARY KEY,
+    chain_id      TEXT NOT NULL DEFAULT 'solana',
+    label         TEXT,
+    risk_score    INTEGER NOT NULL DEFAULT 0,
+    times_seen    INTEGER NOT NULL DEFAULT 0,
+    notes         TEXT,
+    first_seen_at TEXT,
+    last_seen_at  TEXT,
+    source        TEXT,
+    meta_json     TEXT
+);
+"""
+
+_FULL_SCHEMA_SQL = (
+    _WALLET_SCHEMA_SQL
+    + """
+CREATE TABLE IF NOT EXISTS incidents (
+    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    mint          TEXT NOT NULL,
+    chain_id      TEXT NOT NULL DEFAULT 'solana',
+    symbol        TEXT,
+    name          TEXT,
+    incident_type TEXT NOT NULL,
+    confidence    INTEGER NOT NULL DEFAULT 50,
+    evidence_json TEXT,
+    source        TEXT,
+    created_at    TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_incidents_mint ON incidents(mint);
+
+CREATE TABLE IF NOT EXISTS wallet_mint_links (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    wallet     TEXT NOT NULL,
+    mint       TEXT NOT NULL,
+    role       TEXT NOT NULL,
+    evidence   TEXT,
+    created_at TEXT NOT NULL,
+    UNIQUE(wallet, mint, role),
+    FOREIGN KEY(wallet) REFERENCES wallets(address)
+);
+CREATE INDEX IF NOT EXISTS idx_links_wallet ON wallet_mint_links(wallet);
+CREATE INDEX IF NOT EXISTS idx_links_mint ON wallet_mint_links(mint);
+
+CREATE TABLE IF NOT EXISTS seen_mints (
+    mint       TEXT PRIMARY KEY,
+    chain_id   TEXT NOT NULL DEFAULT 'solana',
+    symbol     TEXT,
+    name       TEXT,
+    creator    TEXT,
+    first_seen TEXT NOT NULL,
+    last_checked TEXT,
+    meta_json  TEXT
+);
+
+CREATE TABLE IF NOT EXISTS alerts (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    wallet     TEXT NOT NULL,
+    mint       TEXT NOT NULL,
+    role       TEXT,
+    risk_score INTEGER,
+    message    TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    acked      INTEGER NOT NULL DEFAULT 0
+);
+CREATE INDEX IF NOT EXISTS idx_alerts_created ON alerts(created_at DESC);
+
+CREATE TABLE IF NOT EXISTS app_meta (
+    key   TEXT PRIMARY KEY,
+    value TEXT NOT NULL
+);
+"""
+)
+
+
 class RugWatchDB:
+    """
+    Local wallet warehouse.
+
+    Primary file: data/rugwatch.db (incidents, alerts, meta + wallets).
+    Overflow wallet shards when local cap is hit:
+      data/rugwatch_002.db, rugwatch_003.db, ...
+    """
+
     def __init__(self, path: Path | None = None) -> None:
         self.path = path or db_path()
         self.path.parent.mkdir(parents=True, exist_ok=True)
-        self._init_schema()
+        self._init_schema(self.path, primary=True)
 
-    def connect(self) -> sqlite3.Connection:
-        conn = sqlite3.connect(str(self.path))
+    def connect(self, path: Path | None = None) -> sqlite3.Connection:
+        p = path or self.path
+        conn = sqlite3.connect(str(p))
         conn.row_factory = sqlite3.Row
-        conn.execute("PRAGMA foreign_keys = ON")
+        # OFF: wallet overflow shards may hold addresses that links/alerts
+        # on the primary DB still reference (multi-DB warehouse).
+        conn.execute("PRAGMA foreign_keys = OFF")
         conn.execute("PRAGMA journal_mode = WAL")
         return conn
 
     @contextmanager
-    def session(self) -> Iterator[sqlite3.Connection]:
-        conn = self.connect()
+    def session(self, path: Path | None = None) -> Iterator[sqlite3.Connection]:
+        conn = self.connect(path)
         try:
             yield conn
             conn.commit()
@@ -41,95 +128,129 @@ class RugWatchDB:
         finally:
             conn.close()
 
-    def _init_schema(self) -> None:
-        with self.session() as conn:
-            conn.executescript(
-                """
-                CREATE TABLE IF NOT EXISTS wallets (
-                    address       TEXT PRIMARY KEY,
-                    chain_id      TEXT NOT NULL DEFAULT 'solana',
-                    label         TEXT,
-                    risk_score    INTEGER NOT NULL DEFAULT 0,
-                    times_seen    INTEGER NOT NULL DEFAULT 0,
-                    notes         TEXT,
-                    first_seen_at TEXT,
-                    last_seen_at  TEXT,
-                    source        TEXT,
-                    meta_json     TEXT
-                );
-
-                CREATE TABLE IF NOT EXISTS incidents (
-                    id            INTEGER PRIMARY KEY AUTOINCREMENT,
-                    mint          TEXT NOT NULL,
-                    chain_id      TEXT NOT NULL DEFAULT 'solana',
-                    symbol        TEXT,
-                    name          TEXT,
-                    incident_type TEXT NOT NULL,
-                    confidence    INTEGER NOT NULL DEFAULT 50,
-                    evidence_json TEXT,
-                    source        TEXT,
-                    created_at    TEXT NOT NULL
-                );
-                CREATE INDEX IF NOT EXISTS idx_incidents_mint ON incidents(mint);
-
-                CREATE TABLE IF NOT EXISTS wallet_mint_links (
-                    id         INTEGER PRIMARY KEY AUTOINCREMENT,
-                    wallet     TEXT NOT NULL,
-                    mint       TEXT NOT NULL,
-                    role       TEXT NOT NULL,
-                    evidence   TEXT,
-                    created_at TEXT NOT NULL,
-                    UNIQUE(wallet, mint, role),
-                    FOREIGN KEY(wallet) REFERENCES wallets(address)
-                );
-                CREATE INDEX IF NOT EXISTS idx_links_wallet ON wallet_mint_links(wallet);
-                CREATE INDEX IF NOT EXISTS idx_links_mint ON wallet_mint_links(mint);
-
-                CREATE TABLE IF NOT EXISTS seen_mints (
-                    mint       TEXT PRIMARY KEY,
-                    chain_id   TEXT NOT NULL DEFAULT 'solana',
-                    symbol     TEXT,
-                    name       TEXT,
-                    creator    TEXT,
-                    first_seen TEXT NOT NULL,
-                    last_checked TEXT,
-                    meta_json  TEXT
-                );
-
-                CREATE TABLE IF NOT EXISTS alerts (
-                    id         INTEGER PRIMARY KEY AUTOINCREMENT,
-                    wallet     TEXT NOT NULL,
-                    mint       TEXT NOT NULL,
-                    role       TEXT,
-                    risk_score INTEGER,
-                    message    TEXT NOT NULL,
-                    created_at TEXT NOT NULL,
-                    acked      INTEGER NOT NULL DEFAULT 0
-                );
-                CREATE INDEX IF NOT EXISTS idx_alerts_created ON alerts(created_at DESC);
-
-                -- App counters (survive wallet clear; like a view-count style total)
-                CREATE TABLE IF NOT EXISTS app_meta (
-                    key   TEXT PRIMARY KEY,
-                    value TEXT NOT NULL
-                );
-                """
-            )
+    def _init_schema(self, path: Path, *, primary: bool = False) -> None:
+        sql = _FULL_SCHEMA_SQL if primary else _WALLET_SCHEMA_SQL
+        with self.session(path) as conn:
+            conn.executescript(sql)
+            if not primary:
+                return
             # Seed lifetime counter if missing
             row = conn.execute(
                 "SELECT value FROM app_meta WHERE key = ?",
                 ("wallets_logged_lifetime",),
             ).fetchone()
             if row is None:
-                # Bootstrap from current wallet count so existing DBs don't show 0 forever
                 try:
                     n = int(conn.execute("SELECT COUNT(*) FROM wallets").fetchone()[0])
                 except sqlite3.Error:
                     n = 0
+                # Include overflow shards already on disk
+                for sp in self.shard_paths()[1:]:
+                    try:
+                        with self.connect(sp) as c2:
+                            n += int(c2.execute("SELECT COUNT(*) FROM wallets").fetchone()[0])
+                    except sqlite3.Error:
+                        pass
                 conn.execute(
                     "INSERT INTO app_meta(key, value) VALUES (?, ?)",
                     ("wallets_logged_lifetime", str(n)),
                 )
+
+    # ── multi-DB (local shards) ───────────────────────────────────────
+
+    def shard_paths(self) -> list[Path]:
+        """Primary + overflow wallet DBs, ordered."""
+        import re
+
+        primary = self.path
+        parent = primary.parent
+        stem = primary.stem
+        out = [primary]
+        pat = re.compile(rf"^{re.escape(stem)}_(\d{{3}})\.db$", re.I)
+        extras: list[tuple[int, Path]] = []
+        try:
+            for p in parent.iterdir():
+                if not p.is_file():
+                    continue
+                m = pat.match(p.name)
+                if m:
+                    extras.append((int(m.group(1)), p))
+        except OSError:
+            pass
+        extras.sort(key=lambda t: t[0])
+        out.extend(p for _, p in extras)
+        return out
+
+    def local_shard_info(self) -> list[dict[str, Any]]:
+        info: list[dict[str, Any]] = []
+        for i, p in enumerate(self.shard_paths(), start=1):
+            try:
+                with self.connect(p) as conn:
+                    n = int(conn.execute("SELECT COUNT(*) FROM wallets").fetchone()[0])
+            except sqlite3.Error:
+                n = 0
+            info.append(
+                {
+                    "index": i,
+                    "path": str(p.name),
+                    "wallets": n,
+                    "max": local_db_max(),
+                }
+            )
+        return info
+
+    def _wallet_count_at(self, path: Path) -> int:
+        try:
+            with self.connect(path) as conn:
+                return int(conn.execute("SELECT COUNT(*) FROM wallets").fetchone()[0])
+        except sqlite3.Error:
+            return 0
+
+    def _find_wallet_shard(self, address: str) -> Path | None:
+        address = address.strip()
+        if not address:
+            return None
+        for p in self.shard_paths():
+            try:
+                with self.connect(p) as conn:
+                    row = conn.execute(
+                        "SELECT 1 FROM wallets WHERE address = ?", (address,)
+                    ).fetchone()
+                    if row is not None:
+                        return p
+            except sqlite3.Error:
+                continue
+        return None
+
+    def _shard_for_new_wallet(self) -> Path:
+        """Last shard if under cap; else create next overflow DB."""
+        max_n = local_db_max()
+        paths = self.shard_paths()
+        last = paths[-1]
+        if self._wallet_count_at(last) < max_n:
+            return last
+        # Create next numbered shard
+        import re
+
+        stem = self.path.stem
+        highest = 1
+        for p in paths[1:]:
+            m = re.match(rf"^{re.escape(stem)}_(\d{{3}})\.db$", p.name, re.I)
+            if m:
+                highest = max(highest, int(m.group(1)))
+        nxt = self.path.parent / f"{stem}_{highest + 1:03d}.db"
+        self._init_schema(nxt, primary=False)
+        return nxt
+
+    def _bump_lifetime(self) -> None:
+        with self.session(self.path) as conn:
+            conn.execute(
+                """
+                INSERT INTO app_meta(key, value) VALUES ('wallets_logged_lifetime', '1')
+                ON CONFLICT(key) DO UPDATE SET
+                    value = CAST(CAST(value AS INTEGER) + 1 AS TEXT)
+                """
+            )
 
     # ── wallets ────────────────────────────────────────────────────────
 
@@ -149,7 +270,10 @@ class RugWatchDB:
         if not address:
             return
         now = utc_now()
-        with self.session() as conn:
+        existing_path = self._find_wallet_shard(address)
+        target = existing_path if existing_path is not None else self._shard_for_new_wallet()
+
+        with self.session(target) as conn:
             row = conn.execute(
                 "SELECT address, risk_score, times_seen FROM wallets WHERE address = ?",
                 (address,),
@@ -175,74 +299,93 @@ class RugWatchDB:
                         json.dumps(meta or {}),
                     ),
                 )
-                # Lifetime "wallets logged" counter (like a view counter — not reset on clear)
+            else:
+                new_score = max(int(row["risk_score"] or 0), int(risk_score or 0))
+                times = int(row["times_seen"] or 0) + (1 if bump_seen else 0)
                 conn.execute(
                     """
-                    INSERT INTO app_meta(key, value) VALUES ('wallets_logged_lifetime', '1')
-                    ON CONFLICT(key) DO UPDATE SET
-                        value = CAST(CAST(value AS INTEGER) + 1 AS TEXT)
-                    """
+                    UPDATE wallets SET
+                        risk_score = ?,
+                        times_seen = ?,
+                        last_seen_at = ?,
+                        label = COALESCE(?, label),
+                        notes = CASE
+                            WHEN ? IS NOT NULL AND ? != '' THEN
+                                CASE WHEN notes IS NULL OR notes = '' THEN ?
+                                ELSE notes || ' | ' || ? END
+                            ELSE notes END,
+                        source = COALESCE(?, source),
+                        meta_json = COALESCE(?, meta_json)
+                    WHERE address = ?
+                    """,
+                    (
+                        new_score,
+                        times,
+                        now,
+                        label,
+                        notes,
+                        notes,
+                        notes,
+                        notes,
+                        source,
+                        json.dumps(meta) if meta is not None else None,
+                        address,
+                    ),
                 )
                 return
-            new_score = max(int(row["risk_score"] or 0), int(risk_score or 0))
-            times = int(row["times_seen"] or 0) + (1 if bump_seen else 0)
-            conn.execute(
-                """
-                UPDATE wallets SET
-                    risk_score = ?,
-                    times_seen = ?,
-                    last_seen_at = ?,
-                    label = COALESCE(?, label),
-                    notes = CASE
-                        WHEN ? IS NOT NULL AND ? != '' THEN
-                            CASE WHEN notes IS NULL OR notes = '' THEN ?
-                            ELSE notes || ' | ' || ? END
-                        ELSE notes END,
-                    source = COALESCE(?, source),
-                    meta_json = COALESCE(?, meta_json)
-                WHERE address = ?
-                """,
-                (
-                    new_score,
-                    times,
-                    now,
-                    label,
-                    notes,
-                    notes,
-                    notes,
-                    notes,
-                    source,
-                    json.dumps(meta) if meta is not None else None,
-                    address,
-                ),
-            )
+
+        # New wallet: bump lifetime on primary only
+        self._bump_lifetime()
 
     def get_wallet(self, address: str) -> dict[str, Any] | None:
-        with self.session() as conn:
+        address = address.strip()
+        p = self._find_wallet_shard(address)
+        if p is None:
+            return None
+        with self.session(p) as conn:
             row = conn.execute(
-                "SELECT * FROM wallets WHERE address = ?", (address.strip(),)
+                "SELECT * FROM wallets WHERE address = ?", (address,)
             ).fetchone()
             return dict(row) if row else None
 
     def list_wallets(
         self, *, min_score: int = 0, limit: int = 200
     ) -> list[dict[str, Any]]:
-        with self.session() as conn:
-            rows = conn.execute(
-                """
-                SELECT * FROM wallets
-                WHERE risk_score >= ?
-                ORDER BY risk_score DESC, times_seen DESC, last_seen_at DESC
-                LIMIT ?
-                """,
-                (min_score, limit),
-            ).fetchall()
-            return [dict(r) for r in rows]
+        """Union across all local shards; highest scores first."""
+        rows: list[dict[str, Any]] = []
+        seen: set[str] = set()
+        for p in self.shard_paths():
+            try:
+                with self.connect(p) as conn:
+                    for r in conn.execute(
+                        """
+                        SELECT * FROM wallets
+                        WHERE risk_score >= ?
+                        ORDER BY risk_score DESC, times_seen DESC, last_seen_at DESC
+                        """,
+                        (min_score,),
+                    ).fetchall():
+                        d = dict(r)
+                        a = d.get("address") or ""
+                        if a and a not in seen:
+                            seen.add(a)
+                            rows.append(d)
+            except sqlite3.Error:
+                continue
+        rows.sort(
+            key=lambda w: (
+                -int(w.get("risk_score") or 0),
+                -int(w.get("times_seen") or 0),
+                str(w.get("last_seen_at") or ""),
+            )
+        )
+        return rows[: max(0, int(limit))]
 
     def known_wallet_set(self, *, min_score: int = 40) -> dict[str, dict[str, Any]]:
-        """address -> wallet row for fast launch checks."""
+        """address -> wallet row for fast launch checks (all local shards)."""
         out: dict[str, dict[str, Any]] = {}
-        for w in self.list_wallets(min_score=min_score, limit=50_000):
+        # High limit: multi-shard can exceed old 50k single-file soft cap
+        for w in self.list_wallets(min_score=min_score, limit=5_000_000):
             out[w["address"]] = w
         return out
 
@@ -410,13 +553,25 @@ class RugWatchDB:
             return default
 
     def stats(self) -> dict[str, Any]:
-        with self.session() as conn:
+        shards = self.local_shard_info()
+        wallets_now = sum(int(s.get("wallets") or 0) for s in shards)
+        high_risk = 0
+        for p in self.shard_paths():
+            try:
+                with self.connect(p) as conn:
+                    high_risk += int(
+                        conn.execute(
+                            "SELECT COUNT(*) FROM wallets WHERE risk_score >= 70"
+                        ).fetchone()[0]
+                    )
+            except sqlite3.Error:
+                pass
+
+        with self.session(self.path) as conn:
             def _c(sql: str) -> int:
                 return int(conn.execute(sql).fetchone()[0])
 
-            wallets_now = _c("SELECT COUNT(*) FROM wallets")
             lifetime = self._meta_int(conn, "wallets_logged_lifetime", wallets_now)
-            # Lifetime never below current list size
             if lifetime < wallets_now:
                 lifetime = wallets_now
                 conn.execute(
@@ -429,32 +584,44 @@ class RugWatchDB:
 
             return {
                 "wallets": wallets_now,
-                "wallets_logged": wallets_now,  # currently in DB (view-count style)
-                "wallets_logged_lifetime": lifetime,  # ever logged (survives Clear DB)
-                "high_risk_wallets": _c("SELECT COUNT(*) FROM wallets WHERE risk_score >= 70"),
+                "wallets_logged": wallets_now,
+                "wallets_logged_lifetime": lifetime,
+                "high_risk_wallets": high_risk,
                 "incidents": _c("SELECT COUNT(*) FROM incidents"),
                 "links": _c("SELECT COUNT(*) FROM wallet_mint_links"),
                 "seen_mints": _c("SELECT COUNT(*) FROM seen_mints"),
                 "alerts": _c("SELECT COUNT(*) FROM alerts"),
                 "unacked_alerts": _c("SELECT COUNT(*) FROM alerts WHERE acked = 0"),
                 "db_path": str(self.path),
+                "local_shards": len(shards),
+                "local_shard_max": local_db_max(),
+                "local_shard_detail": shards,
             }
 
     def clear_all(self, *, sync_cloud: bool = True) -> dict[str, Any]:
-        """Wipe wallets, links, incidents, alerts, seen mints. Returns counts before delete."""
+        """Wipe wallets on all shards + research tables on primary."""
         before = self.stats()
-        with self.session() as conn:
+        # Primary research + wallets
+        with self.session(self.path) as conn:
             conn.execute("DELETE FROM alerts")
             conn.execute("DELETE FROM wallet_mint_links")
             conn.execute("DELETE FROM wallets")
             conn.execute("DELETE FROM incidents")
             conn.execute("DELETE FROM seen_mints")
+        # Overflow wallet shards
+        for p in self.shard_paths()[1:]:
+            try:
+                with self.session(p) as conn:
+                    conn.execute("DELETE FROM wallets")
+            except sqlite3.Error:
+                continue
         out: dict[str, Any] = {
             "wallets_removed": int(before.get("wallets") or 0),
             "incidents_removed": int(before.get("incidents") or 0),
             "links_removed": int(before.get("links") or 0),
             "alerts_removed": int(before.get("alerts") or 0),
             "seen_mints_removed": int(before.get("seen_mints") or 0),
+            "local_shards": int(before.get("local_shards") or 1),
         }
         if sync_cloud:
             try:
@@ -467,8 +634,8 @@ class RugWatchDB:
                 out["cloud"] = {"ok": False, "error": str(exc)}
         return out
 
-    def export_wallets(self, *, min_score: int = 0, limit: int = 100_000) -> list[dict[str, Any]]:
-        """Portable list for GitHub Gist / cloud JSON (no local paths)."""
+    def export_wallets(self, *, min_score: int = 0, limit: int = 5_000_000) -> list[dict[str, Any]]:
+        """Portable list for cloud JSON (all local shards)."""
         rows = self.list_wallets(min_score=min_score, limit=limit)
         out: list[dict[str, Any]] = []
         for w in rows:

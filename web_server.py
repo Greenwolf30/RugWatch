@@ -291,10 +291,12 @@ class RugWatchHandler(BaseHTTPRequestHandler):
                 stats["cloud_wallets"] = cloud.get("count")
                 stats["cloud_ok"] = bool(cloud.get("ok"))
                 stats["cloud_error"] = cloud.get("error")
+                stats["cloud_shards"] = cloud.get("cloud_shards")
             except Exception as exc:  # noqa: BLE001
                 stats["cloud_wallets"] = None
                 stats["cloud_ok"] = False
                 stats["cloud_error"] = str(exc)
+                stats["cloud_shards"] = None
             self._json(200, {"ok": True, "stats": sanitize_public(stats)})
             return
 

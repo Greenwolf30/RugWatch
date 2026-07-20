@@ -143,10 +143,36 @@ def wallets_remote_url() -> str | None:
     Shape: [ {"address":"...","risk_score":70,"label":"manual","notes":"..."}, ... ]
     or { "wallets": [ ... ] }
     Prefer full cloud push/pull via GITHUB_TOKEN + RUGWATCH_GIST_ID (see cloud_store).
+    Prefer index URL when multi-shard: .../data/wallets_index.json
     """
     load_dotenv()
     u = (os.environ.get("RUGWATCH_WALLETS_URL") or "").strip()
     return u or None
+
+
+def cloud_shard_max() -> int:
+    """Max wallets per cloud JSON shard (default 100_000)."""
+    load_dotenv()
+    try:
+        return max(1, int(os.environ.get("RUGWATCH_CLOUD_SHARD_MAX") or 100_000))
+    except ValueError:
+        return 100_000
+
+
+def local_db_max() -> int:
+    """Max wallets per local SQLite shard (default 100_000)."""
+    load_dotenv()
+    try:
+        return max(1, int(os.environ.get("RUGWATCH_LOCAL_DB_MAX") or 100_000))
+    except ValueError:
+        return 100_000
+
+
+def cloud_index_path() -> str:
+    """Repo-relative path for multi-shard wallet index."""
+    load_dotenv()
+    p = (os.environ.get("RUGWATCH_CLOUD_INDEX") or "data/wallets_index.json").strip()
+    return p.lstrip("/") or "data/wallets_index.json"
 
 
 # Risk score bands (0–100)
