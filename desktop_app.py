@@ -210,6 +210,34 @@ def run_gui() -> None:
 
     log_box = make_text(tab_log)
     wallets_box = make_text(tab_wallets)
+    wallets_box.tag_configure("w_nums", foreground="#c4a84a")
+    wallets_box.tag_configure("w_wallet", foreground="#c47a7a")
+    wallets_box.tag_configure("w_mint", foreground="#c47a7a", underline=True)
+    wallets_box.tag_configure("w_meta", foreground="#a86a6a")
+
+    def _on_mint_click(event: Any) -> str:
+        try:
+            idx = wallets_box.index(f"@{event.x},{event.y}")
+            ranges = wallets_box.tag_ranges("w_mint")
+            for i in range(0, len(ranges), 2):
+                start, end = ranges[i], ranges[i + 1]
+                if wallets_box.compare(start, "<=", idx) and wallets_box.compare(
+                    idx, "<", end
+                ):
+                    mint = wallets_box.get(start, end).strip()
+                    if mint and mint != "—":
+                        root.clipboard_clear()
+                        root.clipboard_append(mint)
+                        root.update_idletasks()
+                        log(f"Copied mint: {mint[:8]}…")
+                    break
+        except Exception:  # noqa: BLE001
+            pass
+        return "break"
+
+    wallets_box.tag_bind("w_mint", "<Button-1>", _on_mint_click)
+    wallets_box.tag_bind("w_mint", "<Enter>", lambda _e: wallets_box.config(cursor="hand2"))
+    wallets_box.tag_bind("w_mint", "<Leave>", lambda _e: wallets_box.config(cursor=""))
     alerts_box = make_text(tab_alerts)
 
     q: queue.Queue = queue.Queue()
@@ -262,6 +290,7 @@ def run_gui() -> None:
 
     def refresh_wallets() -> None:
         rows = db.list_wallets(min_score=0, limit=100)
+        mint_map = db.wallet_mint_map()
         wallets_box.delete("1.0", "end")
         if not rows:
             wallets_box.insert(
@@ -272,10 +301,17 @@ def run_gui() -> None:
             )
             return
         for w in rows:
+            addr = str(w.get("address") or "").strip()
+            mint = mint_map.get(addr) or RugWatchDB.mint_from_notes(w.get("notes")) or "—"
+            nums = f"{w.get('risk_score'):3}  x{w.get('times_seen')}"
+            wallets_box.insert("end", nums + "  ", "w_nums")
+            wallets_box.insert("end", addr or "(no wallet)", "w_wallet")
+            wallets_box.insert("end", "  ", "w_meta")
+            wallets_box.insert("end", mint, "w_mint")
             wallets_box.insert(
                 "end",
-                f"{w.get('risk_score'):3}  x{w.get('times_seen')}  {w.get('address')}\n"
-                f"     [{w.get('label') or ''}] {(w.get('notes') or '')[:80]}\n\n",
+                f"\n     [{w.get('label') or ''}] {(w.get('notes') or '')[:80]}\n\n",
+                "w_meta",
             )
 
     def refresh_alerts() -> None:

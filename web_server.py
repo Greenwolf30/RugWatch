@@ -157,14 +157,21 @@ def provider_status() -> dict[str, Any]:
     }
 
 
-def public_wallet_row(w: dict[str, Any]) -> dict[str, Any]:
+def public_wallet_row(
+    w: dict[str, Any], *, mint: str | None = None
+) -> dict[str, Any]:
+    notes = (w.get("notes") or "")[:500]
+    mint_out = (mint or "").strip() or None
+    if not mint_out:
+        mint_out = RugWatchDB.mint_from_notes(notes)
     return {
         "address": w.get("address"),
+        "mint": mint_out,
         "chain_id": w.get("chain_id") or "solana",
         "label": w.get("label"),
         "risk_score": int(w.get("risk_score") or 0),
         "times_seen": int(w.get("times_seen") or 0),
-        "notes": (w.get("notes") or "")[:500],
+        "notes": notes,
         "source": w.get("source"),
         "first_seen_at": w.get("first_seen_at"),
         "last_seen_at": w.get("last_seen_at"),
@@ -318,12 +325,20 @@ class RugWatchHandler(BaseHTTPRequestHandler):
                 limit = 100
             db = RugWatchDB()
             rows = db.list_wallets(min_score=min_score, limit=limit)
+            mint_map = db.wallet_mint_map()
+            wallets_out = []
+            for w in rows:
+                d = dict(w)
+                addr = (d.get("address") or "").strip()
+                wallets_out.append(
+                    public_wallet_row(d, mint=mint_map.get(addr))
+                )
             self._json(
                 200,
                 {
                     "ok": True,
-                    "count": len(rows),
-                    "wallets": [public_wallet_row(dict(w)) for w in rows],
+                    "count": len(wallets_out),
+                    "wallets": wallets_out,
                 },
             )
             return

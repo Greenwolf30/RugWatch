@@ -239,6 +239,82 @@ body {
   overflow: auto;
   max-height: 60vh;
 }
+
+/* Wallets tab: yellow scores | red wallet | red mint (mint is click-to-copy) */
+#panel-wallets .box,
+#walletsBox {
+  white-space: normal;
+  color: #c47a7a;
+}
+#walletsBox .w-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 10px 16px;
+  padding: 10px 4px;
+  border-bottom: 1px solid rgba(80, 90, 100, 0.35);
+  width: 100%;
+}
+#walletsBox .w-left {
+  flex: 0 0 4.5rem;
+  color: #c4a84a;
+  font-weight: 600;
+  white-space: pre;
+  pointer-events: none;
+  cursor: default;
+}
+#walletsBox .w-mid {
+  flex: 1 1 200px;
+  min-width: 140px;
+  word-break: break-all;
+  color: #c47a7a;
+}
+#walletsBox .w-wallet {
+  color: #c47a7a;
+  font-weight: 500;
+}
+#walletsBox .w-meta {
+  margin-top: 4px;
+  font-size: 0.88em;
+  color: #a86a6a;
+  pointer-events: none;
+}
+#walletsBox .w-right {
+  flex: 1 1 200px;
+  min-width: 140px;
+  text-align: right;
+  word-break: break-all;
+  margin-left: auto;
+}
+#walletsBox button.w-mint {
+  display: inline-block;
+  max-width: 100%;
+  background: transparent;
+  border: none;
+  padding: 0;
+  margin: 0;
+  font: inherit;
+  font-family: var(--mono);
+  color: #c47a7a;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+  font-weight: 500;
+  text-align: right;
+  word-break: break-all;
+}
+#walletsBox button.w-mint:hover {
+  color: #d49090;
+}
+#walletsBox button.w-mint.copied {
+  color: #6aab80;
+  text-decoration: none;
+}
+#walletsBox .w-mint-empty {
+  color: #6a7080;
+  font-size: 0.9em;
+}
+
 textarea.box { resize: vertical; min-height: 280px; }
 
 .hint { font-size: 0.82rem; color: var(--muted); margin: 0 0 10px; line-height: 1.45; }

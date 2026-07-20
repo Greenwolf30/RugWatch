@@ -389,6 +389,45 @@ class RugWatchDB:
             out[w["address"]] = w
         return out
 
+    def wallet_mint_map(self) -> dict[str, str]:
+        """
+        wallet address -> most recent linked mint (primary DB links table).
+        Used by the Wallets UI to show mint next to each wallet.
+        """
+        import re
+
+        out: dict[str, str] = {}
+        # Links live on primary DB
+        try:
+            with self.connect(self.path) as conn:
+                for r in conn.execute(
+                    """
+                    SELECT wallet, mint FROM wallet_mint_links
+                    ORDER BY id ASC
+                    """
+                ).fetchall():
+                    w = (r[0] or "").strip()
+                    m = (r[1] or "").strip()
+                    if w and m:
+                        out[w] = m  # last row wins (most recent)
+        except sqlite3.Error:
+            pass
+        return out
+
+    @staticmethod
+    def mint_from_notes(notes: str | None) -> str | None:
+        """Parse 'mint <address>' from Ruggers-style notes if present."""
+        if not notes:
+            return None
+        import re
+
+        m = re.search(
+            r"\bmint\s+([1-9A-HJ-NP-Za-km-z]{32,48})\b",
+            str(notes),
+            flags=re.I,
+        )
+        return m.group(1) if m else None
+
     # ── incidents & links ──────────────────────────────────────────────
 
     def add_incident(

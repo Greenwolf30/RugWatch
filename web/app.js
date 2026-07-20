@@ -112,8 +112,42 @@
     }
   }
 
+  function escHtml(s) {
+    return String(s || "")
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;");
+  }
+
+  function copyToClipboard(text) {
+    const t = String(text || "").trim();
+    if (!t) return Promise.reject(new Error("empty"));
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      return navigator.clipboard.writeText(t);
+    }
+    return new Promise((resolve, reject) => {
+      try {
+        const ta = document.createElement("textarea");
+        ta.value = t;
+        ta.setAttribute("readonly", "");
+        ta.style.position = "fixed";
+        ta.style.left = "-9999px";
+        document.body.appendChild(ta);
+        ta.select();
+        const ok = document.execCommand("copy");
+        document.body.removeChild(ta);
+        if (ok) resolve();
+        else reject(new Error("copy failed"));
+      } catch (e) {
+        reject(e);
+      }
+    });
+  }
+
   async function refreshWallets() {
     const box = $("walletsBox");
+    if (!box) return;
     try {
       const data = await apiGet("/api/wallets?limit=100");
       const rows = data.wallets || [];
@@ -122,24 +156,78 @@
           "No wallets yet.\nUse Add wallet, or Upload manual wallets (next to Add wallet).\n";
         return;
       }
-      box.textContent = rows
-        .map(
-          (w) =>
-            String(w.risk_score).padStart(3) +
-            "  x" +
-            (w.times_seen || 0) +
+      // Left: yellow scores · middle: red wallet · right: red mint (click to copy)
+      box.innerHTML = rows
+        .map((w) => {
+          const score = String(w.risk_score != null ? w.risk_score : 0).padStart(3);
+          const times = "x" + (w.times_seen || 0);
+          const rawWallet = String(w.address || "").trim();
+          const rawMint = String(w.mint || "").trim();
+          const label = escHtml(w.label || "");
+          const notes = escHtml(String(w.notes || "").slice(0, 80));
+          const walletHtml = rawWallet
+            ? '<span class="w-wallet">' + escHtml(rawWallet) + "</span>"
+            : '<span class="w-wallet">(no wallet)</span>';
+          const mintHtml = rawMint
+            ? '<button type="button" class="w-mint" data-copy="' +
+              escHtml(rawMint) +
+              '" title="Click to copy mint address">' +
+              escHtml(rawMint) +
+              "</button>"
+            : '<span class="w-mint-empty">—</span>';
+          return (
+            '<div class="w-row" role="listitem">' +
+            '<div class="w-left w-nums">' +
+            escHtml(score) +
             "  " +
-            (w.address || "") +
-            "\n     [" +
-            (w.label || "") +
+            escHtml(times) +
+            "</div>" +
+            '<div class="w-mid">' +
+            walletHtml +
+            '<div class="w-meta">[' +
+            label +
             "] " +
-            String(w.notes || "").slice(0, 80) +
-            "\n"
-        )
-        .join("\n");
+            notes +
+            "</div></div>" +
+            '<div class="w-right">' +
+            mintHtml +
+            "</div></div>"
+          );
+        })
+        .join("");
     } catch (e) {
       box.textContent = "Error: " + e.message;
     }
+  }
+
+  function wireWalletMintCopy() {
+    const box = $("walletsBox");
+    if (!box || box.dataset.mintCopyWired === "1") return;
+    box.dataset.mintCopyWired = "1";
+    box.addEventListener("click", (ev) => {
+      const btn =
+        ev.target && ev.target.closest
+          ? ev.target.closest("button.w-mint")
+          : null;
+      if (!btn || !box.contains(btn)) return;
+      ev.preventDefault();
+      const text = (btn.getAttribute("data-copy") || btn.textContent || "").trim();
+      if (!text) return;
+      copyToClipboard(text)
+        .then(() => {
+          log("Copied mint: " + text.slice(0, 8) + "…");
+          const prev = btn.textContent;
+          btn.classList.add("copied");
+          btn.textContent = "copied!";
+          setTimeout(() => {
+            btn.textContent = prev;
+            btn.classList.remove("copied");
+          }, 900);
+        })
+        .catch(() => {
+          alert("Copy failed — select and copy manually:\n" + text);
+        });
+    });
   }
 
   function formatAlertWeb(a) {
@@ -376,6 +464,7 @@
   }
 
   function wire() {
+    wireWalletMintCopy();
     document.querySelectorAll(".tab").forEach((t) => {
       t.addEventListener("click", () => switchTab(t.dataset.tab));
     });
