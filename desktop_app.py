@@ -102,7 +102,7 @@ def run_gui() -> None:
         lab.pack(side="left", padx=4)
         return lab
 
-    pill_now = _pill(pills, wallets_now_var, fg="#8ee4a8")
+    pill_now = _pill(pills, wallets_now_var, fg="#ff4d4d")
     pill_life = _pill(pills, wallets_life_var, fg=ACCENT)
     pill_cloud = _pill(pills, wallets_cloud_var, fg="#7ec8e3")
     pill_now.configure(cursor="hand2")
@@ -210,6 +210,8 @@ def run_gui() -> None:
 
     log_box = make_text(tab_log)
     wallets_box = make_text(tab_wallets)
+    # Wallets tab content: all data in red
+    wallets_box.configure(fg="#ff4d4d", insertbackground="#ff4d4d")
     alerts_box = make_text(tab_alerts)
 
     q: queue.Queue = queue.Queue()

@@ -119,7 +119,11 @@ body {
   cursor: default;
   user-select: none;
 }
-.pill-wallets { color: var(--ok); }
+.pill-wallets {
+  color: #ff4d4d;
+  border-color: rgba(255, 77, 77, 0.45);
+  background: rgba(255, 40, 40, 0.08);
+}
 .pill-logged { color: var(--accent); }
 .pill-cloud { color: #7ec8e3; cursor: pointer; }
 .pill-cloud:hover { border-color: #7ec8e3; }
@@ -238,6 +242,16 @@ body {
   word-break: break-word;
   overflow: auto;
   max-height: 60vh;
+}
+/* Wallets tab: all wallet list data in red */
+#panel-wallets .box,
+#walletsBox {
+  color: #ff4d4d;
+  border-color: rgba(255, 77, 77, 0.35);
+}
+#panel-wallets .box a,
+#walletsBox a {
+  color: #ff6b6b;
 }
 textarea.box { resize: vertical; min-height: 280px; }
 
