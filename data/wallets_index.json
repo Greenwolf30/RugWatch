@@ -9,6 +9,6 @@
     }
   ],
   "total_count": 0,
-  "updated_at": "2026-07-20T17:40:01.265147+00:00",
+  "updated_at": "2026-07-20T17:40:48.618468+00:00",
   "note": "Multi-shard wallet index. ATC/readers should load every path in shards[]. Each file is rugwatch_wallets_v1."
 }
