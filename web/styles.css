@@ -1,0 +1,187 @@
+:root {
+  --bg: #0b0f14;
+  --surface: #12181f;
+  --fg: #e8eef6;
+  --muted: #8b9bb0;
+  --accent: #c9a227;
+  --border: #2a3544;
+  --entry: #0e141c;
+  --danger: #f07178;
+  --ok: #8ee4a8;
+  --font: "Segoe UI", system-ui, sans-serif;
+  --mono: "Cascadia Mono", "Consolas", monospace;
+}
+
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  font-family: var(--font);
+  background: var(--bg);
+  color: var(--fg);
+  min-height: 100vh;
+}
+.app { max-width: 1100px; margin: 0 auto; padding: 16px 18px 40px; }
+
+.top {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+  justify-content: space-between;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 12px 16px;
+  margin-bottom: 12px;
+}
+.brand h1 {
+  margin: 0;
+  font-size: 1.35rem;
+  color: var(--accent);
+}
+.tag { margin: 4px 0 0; font-size: 0.8rem; color: var(--muted); }
+.stats { font-size: 0.82rem; color: var(--muted); max-width: 420px; }
+.pills { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.pill {
+  font-size: 0.78rem;
+  font-weight: 700;
+  padding: 6px 12px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: var(--entry);
+  cursor: default;
+  user-select: none;
+}
+.pill-wallets { color: var(--ok); }
+.pill-logged { color: var(--accent); }
+.pill-cloud { color: #7ec8e3; cursor: pointer; }
+.pill-cloud:hover { border-color: #7ec8e3; }
+.gear label { font-size: 0.75rem; color: var(--muted); display: flex; flex-direction: column; gap: 4px; }
+.gear input {
+  background: var(--entry);
+  border: 1px solid var(--border);
+  color: var(--fg);
+  border-radius: 6px;
+  padding: 6px 8px;
+  width: 140px;
+}
+
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px 12px;
+  margin-bottom: 8px;
+}
+.toolbar.manual { margin-bottom: 12px; }
+.toolbar label { font-size: 0.78rem; color: var(--muted); display: flex; align-items: center; gap: 6px; }
+.mint-lab { flex: 1; min-width: 200px; }
+.mint-lab input, .manual input[type="text"] {
+  flex: 1;
+  min-width: 160px;
+  background: var(--entry);
+  border: 1px solid var(--border);
+  color: var(--fg);
+  border-radius: 6px;
+  padding: 8px 10px;
+}
+.manual input[type="number"] {
+  width: 56px;
+  background: var(--entry);
+  border: 1px solid var(--border);
+  color: var(--fg);
+  border-radius: 6px;
+  padding: 6px;
+}
+.chk { font-size: 0.78rem; color: var(--muted); }
+.mono { font-family: var(--mono); font-size: 0.85rem; }
+
+.btn {
+  background: var(--entry);
+  color: var(--fg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 8px 12px;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+.btn:hover { border-color: var(--accent); }
+.btn.accent {
+  background: rgba(201, 162, 39, 0.15);
+  border-color: var(--accent);
+  color: var(--accent);
+  font-weight: 600;
+}
+.btn.danger {
+  border-color: var(--danger);
+  color: var(--danger);
+}
+.btn.danger:hover {
+  background: rgba(240, 113, 120, 0.12);
+}
+/* Upload next to Add wallet — normal weight (not bold) */
+.file-btn {
+  display: inline-block;
+  font-weight: 400;
+}
+.inline-status {
+  font-size: 0.78rem;
+  color: var(--accent);
+  margin: 0;
+}
+
+.tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+.tab {
+  background: var(--surface);
+  color: var(--muted);
+  border: 1px solid var(--border);
+  border-radius: 8px 8px 0 0;
+  padding: 8px 14px;
+  cursor: pointer;
+  font-size: 0.85rem;
+}
+.tab.active {
+  color: var(--accent);
+  border-bottom-color: var(--bg);
+  font-weight: 600;
+}
+
+.panel { display: none; }
+.panel.active { display: block; }
+
+.box {
+  width: 100%;
+  min-height: 320px;
+  background: var(--entry);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--fg);
+  padding: 12px;
+  margin: 0;
+  white-space: pre-wrap;
+  word-break: break-word;
+  overflow: auto;
+  max-height: 60vh;
+}
+textarea.box { resize: vertical; min-height: 280px; }
+
+.hint { font-size: 0.82rem; color: var(--muted); margin: 0 0 10px; line-height: 1.45; }
+.upload-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 8px; }
+.status { font-size: 0.85rem; color: var(--accent); margin: 0 0 8px; }
+
+.foot {
+  margin-top: 18px;
+  font-size: 0.75rem;
+  color: var(--muted);
+  line-height: 1.4;
+}
+.foot code { color: var(--ok); }

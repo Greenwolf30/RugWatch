@@ -1,0 +1,97 @@
+================================================================================
+  PUT THE WHOLE RUGWATCH FOLDER ON GITHUB (ONE PLACE — NOT SEPARATED)
+================================================================================
+
+Goal:
+  Code + wallet list live in the SAME GitHub repo.
+  Wallets file:  data/wallets_cloud.json
+  Local rugwatch.db is only a cache on your PC.
+
+--------------------------------------------------------------------------------
+  STEP 1 — Create the GitHub repo
+--------------------------------------------------------------------------------
+
+  1. Open https://github.com/new
+  2. Name:  RugWatch   (or any name you like)
+  3. Public or Private (Private recommended if you care about your wallet list)
+  4. Do NOT add README if you will upload existing files
+  5. Create repository
+
+--------------------------------------------------------------------------------
+  STEP 2 — Upload the WHOLE folder (except secrets)
+--------------------------------------------------------------------------------
+
+  Upload everything under:
+    C:\Users\levyr\RugWatch\
+
+  INCLUDE:
+    rugwatch\          (all Python package files)
+    desktop_app.py
+    run_monitor.py
+    requirements.txt
+    README.md
+    EXTERNAL_STORAGE.md
+    UPLOAD-RUGWATCH-TO-GITHUB.txt
+    .gitignore
+    .env.example
+    data\wallets_cloud.json     ← cloud wallet list (starts empty)
+
+  DO NOT UPLOAD:
+    .env                 ← has API keys (Helius, GitHub token, etc.)
+    data\rugwatch.db     ← local cache only (optional; .gitignore blocks it)
+    __pycache__\
+    .venv\
+
+  Easiest without git installed:
+    GitHub repo page → Add file → Upload files → drag the allowed files/folders.
+
+  Or use GitHub Desktop: File → Add local repository → publish.
+
+--------------------------------------------------------------------------------
+  STEP 3 — Token so the app can write wallets into THAT repo
+--------------------------------------------------------------------------------
+
+  1. https://github.com/settings/tokens
+  2. Generate classic token with scope:
+       - repo   (if private repo)  OR
+       - public_repo (if public) for contents
+  3. Edit C:\Users\levyr\RugWatch\.env  (stays on YOUR PC only):
+
+     RUGWATCH_CLOUD=repo
+     RUGWATCH_CLOUD_PRIMARY=1
+     RUGWATCH_GITHUB_REPO=YourGitHubUsername/RugWatch
+     GITHUB_TOKEN=ghp_your_token_here
+     RUGWATCH_GITHUB_PATH=data/wallets_cloud.json
+     RUGWATCH_GITHUB_BRANCH=main
+
+  Replace YourGitHubUsername/RugWatch with your real repo.
+
+--------------------------------------------------------------------------------
+  STEP 4 — Connect
+--------------------------------------------------------------------------------
+
+  cd C:\Users\levyr\RugWatch
+  python -m rugwatch cloud-status
+  python -m rugwatch cloud-init
+  python -m rugwatch push-cloud
+
+  Or open desktop_app.py → Push cloud.
+
+  After that, Add wallet updates data/wallets_cloud.json ON GITHUB
+  (same project — not a separate Gist).
+
+--------------------------------------------------------------------------------
+  HOW IT STAYS "NOT SEPARATED"
+--------------------------------------------------------------------------------
+
+  GitHub repo RugWatch/
+    ├── rugwatch/           code
+    ├── desktop_app.py
+    ├── data/
+    │   └── wallets_cloud.json   ← all logged wallets (cloud truth)
+    └── ...
+
+  Your PC still has a small cache:
+    data/rugwatch.db   (ignored by git — not the source of truth)
+
+================================================================================

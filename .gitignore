@@ -1,0 +1,21 @@
+.env
+.env.local
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+venv/
+dist/
+build/
+*.egg-info/
+data/*.db
+data/*.db-journal
+data/*.db-wal
+data/*.db-shm
+data/alerts.log
+# Keep data/wallets_cloud.json in the repo (cloud list — not ignored)
+.DS_Store

@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="referrer" content="no-referrer" />
+  <title>RugWatch — serial wallet DB</title>
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+  <div class="app">
+    <header class="top">
+      <div class="brand">
+        <h1>RugWatch</h1>
+        <p class="tag">Serial rugger wallet DB · website (keys stay on the server)</p>
+      </div>
+      <div class="pills" id="pillsBar" title="wallets = local now · logged = lifetime · cloud = GitHub now">
+        <span class="pill pill-wallets" id="pillWallets">wallets —</span>
+        <span class="pill pill-logged" id="pillLogged">logged —</span>
+        <span class="pill pill-cloud" id="pillCloud">cloud —</span>
+      </div>
+      <div class="stats" id="statsBar">Loading…</div>
+      <div class="gear">
+        <label title="Required if server set WEB_API_TOKEN">Site passcode
+          <input type="password" id="siteToken" placeholder="optional" autocomplete="off" />
+        </label>
+      </div>
+    </header>
+
+    <section class="toolbar">
+      <label class="mint-lab">Mint
+        <input type="text" id="mintInput" class="mono" placeholder="Token mint address" />
+      </label>
+      <label class="chk"><input type="checkbox" id="deepScan" checked /> Deep (Helius on server)</label>
+      <button type="button" id="btnScan" class="btn accent">Scan mint</button>
+      <button type="button" id="btnMonitor" class="btn">Monitor once</button>
+      <button type="button" id="btnRefresh" class="btn">Refresh</button>
+      <button type="button" id="btnPushCloud" class="btn">Push cloud</button>
+      <button type="button" id="btnPullCloud" class="btn">Pull cloud</button>
+      <button type="button" id="btnClearDb" class="btn danger">Clear DB</button>
+    </section>
+
+    <section class="toolbar manual">
+      <label>Add wallet
+        <input type="text" id="walletInput" class="mono" placeholder="Wallet address" />
+      </label>
+      <label>Score <input type="number" id="scoreInput" value="75" min="0" max="100" /></label>
+      <button type="button" id="btnAdd" class="btn">Add wallet</button>
+      <!-- File upload next to Add wallet (no Upload tab) -->
+      <label class="btn file-btn" id="btnUploadLabel">Upload manual wallets
+        <input type="file" id="fileInput" accept=".json,.txt,text/plain,application/json" hidden />
+      </label>
+      <span id="uploadStatus" class="status inline-status" hidden></span>
+    </section>
+
+    <nav class="tabs" role="tablist">
+      <button type="button" class="tab active" data-tab="log" role="tab">Log</button>
+      <button type="button" class="tab" data-tab="wallets" role="tab">Wallets</button>
+      <button type="button" class="tab" data-tab="alerts" role="tab">Alerts</button>
+    </nav>
+
+    <main>
+      <section id="panel-log" class="panel active" data-panel="log">
+        <pre id="logBox" class="box mono"></pre>
+      </section>
+
+      <section id="panel-wallets" class="panel" data-panel="wallets">
+        <pre id="walletsBox" class="box mono"></pre>
+      </section>
+
+      <section id="panel-alerts" class="panel" data-panel="alerts">
+        <pre id="alertsBox" class="box mono"></pre>
+      </section>
+    </main>
+
+    <footer class="foot">
+      Not financial advice. Heuristics only.
+      API keys (Helius, etc.) load only on the server from <code>.env</code>.
+      Bulk import: <strong>Upload manual wallets</strong> next to Add wallet (JSON/txt from ATC Ruggers Export).
+    </footer>
+  </div>
+  <script src="/config.js"></script>
+  <script src="/app.js"></script>
+</body>
+</html>

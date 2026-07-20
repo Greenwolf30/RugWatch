@@ -1,0 +1,13 @@
+RugWatch is a separate application.
+
+Location:  C:\Users\levyr\RugWatch
+Database:  C:\Users\levyr\RugWatch\data\rugwatch.db
+Config:    C:\Users\levyr\RugWatch\.env
+
+It does NOT import or depend on:
+  C:\Users\levyr\GrokScreener  (Leonidas)
+
+Run only from this folder:
+  cd C:\Users\levyr\RugWatch
+  python desktop_app.py
+  python -m rugwatch --help
