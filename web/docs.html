@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>RugWatch — Docs</title>
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+  <div class="app app-docs">
+    <nav class="site-nav" aria-label="Main">
+      <div class="site-nav-inner">
+        <div class="nav-left">
+          <a class="nav-brand" href="/" title="Home">RugWatch</a>
+        </div>
+        <div class="nav-links">
+          <a class="nav-link active" href="/docs.html">Docs</a>
+          <a
+            class="nav-link"
+            href="https://github.com/Greenwolf30/RugWatch"
+            target="_blank"
+            rel="noopener noreferrer"
+            >GitHub</a
+          >
+        </div>
+      </div>
+    </nav>
+
+    <header class="top docs-hero">
+      <div class="brand">
+        <h1>RugWatch documentation</h1>
+        <p class="tag">How to use the website · cloud · capacity · ATC</p>
+      </div>
+    </header>
+
+    <main class="docs-body">
+      <section class="docs-card">
+        <h2>Quick start</h2>
+        <ol>
+          <li>Keep keys only in <code>RugWatch/.env</code> (never in the browser).</li>
+          <li>Run: <code>python run_web.py --port 8790</code></li>
+          <li>Open <a href="/">http://127.0.0.1:8790/</a></li>
+          <li>Add / upload wallets · click <strong>Push cloud</strong> to update GitHub.</li>
+        </ol>
+      </section>
+
+      <section class="docs-card">
+        <h2>Cloud (GitHub)</h2>
+        <ul>
+          <li><code>RUGWATCH_CLOUD=repo</code> + <code>RUGWATCH_GITHUB_REPO</code> + <code>GITHUB_TOKEN</code></li>
+          <li>Files: <code>data/wallets_cloud.json</code> (+ <code>_002</code>…) and <code>data/wallets_index.json</code></li>
+          <li><strong>100,000 wallets per cloud file / per local DB</strong> — then auto-shard</li>
+          <li>ATC Render URL: raw <code>…/data/wallets_index.json</code></li>
+        </ul>
+      </section>
+
+      <section class="docs-card">
+        <h2>From Actual Token Checker</h2>
+        <ul>
+          <li>Ruggers tab → yellow <strong>Upload</strong> on Creator / Similar / Single</li>
+          <li>Sends wallets here and <strong>Push cloud</strong> (RugWatch must be running)</li>
+          <li>Or Export JSON and use <strong>Upload manual wallets</strong> on this site</li>
+        </ul>
+      </section>
+
+      <section class="docs-card">
+        <h2>Full guide on GitHub</h2>
+        <p>
+          Complete user guide:
+          <a
+            href="https://github.com/Greenwolf30/RugWatch/blob/main/RugCheck%20Documentation.md"
+            target="_blank"
+            rel="noopener noreferrer"
+            >RugCheck Documentation.md</a
+          >
+        </p>
+        <p>
+          Storage / capacity:
+          <a
+            href="https://github.com/Greenwolf30/RugWatch/blob/main/EXTERNAL_STORAGE.md"
+            target="_blank"
+            rel="noopener noreferrer"
+            >EXTERNAL_STORAGE.md</a
+          >
+        </p>
+      </section>
+
+      <p class="docs-back"><a href="/">← Back to RugWatch</a></p>
+    </main>
+
+    <footer class="foot">Not financial advice. Heuristics only.</footer>
+  </div>
+</body>
+</html>

@@ -433,8 +433,35 @@ class RugWatchHandler(BaseHTTPRequestHandler):
             if not items:
                 self._json(400, {"ok": False, "error": "No wallets found", "imported": 0})
                 return
-            stats = db.import_wallets(items, source_default="web_upload")
-            self._json(200, {"ok": True, **stats})
+            src = str(body.get("source") or "web_upload")
+            stats = db.import_wallets(items, source_default=src)
+            out: dict[str, Any] = {"ok": True, **stats, "db_wallets": db.stats().get("wallets")}
+            # ATC Ruggers "Upload" sends push_cloud=true to grow the GitHub cloud list
+            push_flag = body.get("push_cloud")
+            if push_flag is True or str(push_flag).strip().lower() in {
+                "1",
+                "true",
+                "yes",
+                "on",
+            }:
+                try:
+                    from rugwatch.cloud_store import push_to_cloud
+
+                    pr = push_to_cloud(db)
+                    out["cloud"] = {
+                        "ok": bool(pr.get("ok")),
+                        "wallet_count": pr.get("wallet_count"),
+                        "cloud_shards": pr.get("cloud_shards"),
+                        "path": pr.get("path"),
+                        "index_path": pr.get("index_path"),
+                        "error": pr.get("error"),
+                        "note": pr.get("note"),
+                    }
+                    if not pr.get("ok"):
+                        out["cloud_error"] = pr.get("error")
+                except Exception as exc:  # noqa: BLE001
+                    out["cloud"] = {"ok": False, "error": str(exc)}
+            self._json(200, out)
             return
 
         if path == "/api/scan":
@@ -486,6 +513,8 @@ class RugWatchHandler(BaseHTTPRequestHandler):
                 "action": result.get("action"),
                 "mode": result.get("mode"),
                 "wallet_count": result.get("wallet_count"),
+                "cloud_shards": result.get("cloud_shards"),
+                "index_path": result.get("index_path"),
                 "path": result.get("path"),  # repo-relative path, not a secret
                 "repo": result.get("repo"),
                 "html_url": result.get("html_url"),
