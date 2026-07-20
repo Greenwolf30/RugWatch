@@ -29,7 +29,7 @@
     <header class="top docs-hero">
       <div class="brand">
         <h1>RugWatch documentation</h1>
-        <p class="tag">How to use the website · cloud · capacity · ATC</p>
+        <p class="tag">How to use the website · cloud · capacity · Actual Token Checker</p>
       </div>
     </header>
 
@@ -37,62 +37,56 @@
       <section class="docs-card">
         <h2>Quick start</h2>
         <ol>
-          <li>Keep keys only in <code>RugWatch/.env</code> (never in the browser).</li>
-          <li>Run: <code>python run_web.py --port 8790</code></li>
-          <li>Open <a href="/">http://127.0.0.1:8790/</a></li>
-          <li>Add / upload wallets · click <strong>Push cloud</strong> to update GitHub.</li>
+          <li>Start the website from the RugWatch folder.</li>
+          <li>Open <a href="/">http://127.0.0.1:8790/</a> (or your host and port).</li>
+          <li>Add or upload wallets, then use <strong>Push cloud</strong> to save the list online.</li>
         </ol>
       </section>
 
       <section class="docs-card">
-        <h2>Cloud (GitHub)</h2>
+        <h2>Cloud list</h2>
         <ul>
-          <li><code>RUGWATCH_CLOUD=repo</code> + <code>RUGWATCH_GITHUB_REPO</code> + <code>GITHUB_TOKEN</code></li>
-          <li>Files: <code>data/wallets_cloud.json</code> (+ <code>_002</code>…) and <code>data/wallets_index.json</code></li>
-          <li><strong>100,000 wallets per cloud file / per local DB</strong> — then auto-shard</li>
-          <li>ATC Render URL: raw <code>…/data/wallets_index.json</code></li>
+          <li>Wallet list lives with the project on GitHub: <code>data/wallets_cloud.json</code> (and extra files when the list grows).</li>
+          <li>An index file tracks every cloud file: <code>data/wallets_index.json</code>.</li>
+          <li>About <strong>100,000 wallets</strong> per cloud file and per local database file, then a new file is created automatically.</li>
         </ul>
       </section>
 
       <section class="docs-card">
-        <h2>Local vs cloud (who uses what)</h2>
+        <h2>Local vs cloud</h2>
         <ul>
-          <li><strong>RugWatch</strong> Scan / Monitor / Wallets pill → <strong>local DB</strong> (all shards)</li>
-          <li><strong>Push cloud</strong> → GitHub index + shard files (source ATC reads on Render)</li>
-          <li><strong>ATC</strong> flags → merges <strong>local + cloud</strong> when available; tags [local] [cloud] [both]</li>
-          <li>On Render ATC, usually <strong>cloud only</strong> via <code>RUGWATCH_WALLETS_URL</code></li>
+          <li><strong>RugWatch</strong> Scan, Monitor, and the Wallets list use your <strong>local</strong> database.</li>
+          <li><strong>Push cloud</strong> updates the online list that Actual Token Checker can read.</li>
+          <li><strong>Actual Token Checker</strong> can flag holders from local and/or cloud lists, tagged [local], [cloud], or [both].</li>
         </ul>
       </section>
 
       <section class="docs-card">
         <h2>From Actual Token Checker</h2>
         <ul>
-          <li>Top nav yellow <strong>RugWatch</strong> tab opens this site</li>
-          <li>Analyze checkbox <strong>RugWatch</strong> includes/skips flagged wallets</li>
-          <li>Ruggers tab → yellow <strong>Upload</strong> on Creator / Similar / Single</li>
-          <li>Upload imports here and <strong>Push cloud</strong> (this site must be running)</li>
-          <li>Or Export JSON and use <strong>Upload manual wallets</strong> on this site</li>
+          <li>Open RugWatch from the yellow <strong>RugWatch</strong> link in Actual Token Checker.</li>
+          <li>Use the RugWatch checkbox on Analyze to include or skip flagged wallets.</li>
+          <li>On Ruggers, yellow <strong>Upload</strong> (Creator / Similar / Single) sends sellers into RugWatch and Push cloud.</li>
+          <li>Or Export a file and use <strong>Upload manual wallets</strong> here.</li>
         </ul>
       </section>
 
       <section class="docs-card">
-        <h2>Full guide on GitHub</h2>
+        <h2>Full guides</h2>
         <p>
-          Complete user guide:
           <a
             href="https://github.com/Greenwolf30/RugWatch/blob/main/RugCheck%20Documentation.md"
             target="_blank"
             rel="noopener noreferrer"
-            >RugCheck Documentation.md</a
+            >User guide (RugCheck Documentation.md)</a
           >
         </p>
         <p>
-          Storage / capacity:
           <a
             href="https://github.com/Greenwolf30/RugWatch/blob/main/EXTERNAL_STORAGE.md"
             target="_blank"
             rel="noopener noreferrer"
-            >EXTERNAL_STORAGE.md</a
+            >Cloud storage &amp; capacity (EXTERNAL_STORAGE.md)</a
           >
         </p>
       </section>

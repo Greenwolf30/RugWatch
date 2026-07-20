@@ -1,9 +1,6 @@
 # RugWatch
 
-**Standalone project** — not part of Leonidas / GrokScreener.  
-Own folder, own code, own database, own `.env`. No shared imports.
-
-Local tool that **tracks wallets involved in Solana rugs/scams**, stores them in a **SQLite database**, and **watches new pump.fun-style launches** for those wallets (serial rugger watch).
+Standalone project for tracking wallets involved in Solana rugs/scams, storing them in a local database, and watching new launches for those wallets.
 
 Not financial advice. Heuristics only — false positives happen.
 
@@ -11,16 +8,10 @@ Not financial advice. Heuristics only — false positives happen.
 
 ## What it does
 
-1. **Scan a mint** (token address)  
-   Pulls Rugcheck + optional Pump.fun creator + Helius early signers + optional Solscan holders.  
-   Flags creators, insiders, large holders on risky mints → **wallet DB**.
-
-2. **Store evidence**  
-   `data/rugwatch.db` — wallets, incidents, wallet↔mint links, seen mints, alerts.
-
-3. **Monitor launches**  
-   Polls recent pump-related pairs (DexScreener), resolves creators when possible,  
-   compares against your bad-wallet list → **alerts** (`data/alerts.log` + DB).
+1. **Scan a mint** (token address) and review suggested wallets.  
+2. **Store** wallets, incidents, links, and alerts in a local database.  
+3. **Monitor** new launches against your wallet list.  
+4. **Push cloud** to keep an online list for Actual Token Checker.
 
 ---
 
@@ -28,32 +19,16 @@ Not financial advice. Heuristics only — false positives happen.
 
 ```text
 cd C:\Users\levyr\RugWatch
-copy .env.example .env
-```
-
-Edit `.env`:
-
-```env
-HELIUS_API_KEY=your_key_here
-RUGWATCH_CLOUD=repo
-RUGWATCH_GITHUB_REPO=YourUser/RugWatch
-GITHUB_TOKEN=ghp_...
-RUGWATCH_CLOUD_SHARD_MAX=100000
-RUGWATCH_LOCAL_DB_MAX=100000
-```
-
-Optional: `SOLSCAN_API_KEY`, `BIRDEYE_API_KEY`, `RUGWATCH_POLL_SECONDS=45`
-
-```text
 pip install -r requirements.txt
 python -m rugwatch init-db
 python run_web.py --port 8790
-# open http://127.0.0.1:8790/  ·  Docs: /docs.html
 ```
 
-**Capacity:** 100k wallets per local DB file and per cloud JSON file, then auto-shard (`rugwatch_002.db`, `wallets_cloud_002.json` + `wallets_index.json`). See **EXTERNAL_STORAGE.md**.
+Open http://127.0.0.1:8790/ — on-site docs: `/docs.html`.
 
-**ATC:** Ruggers yellow Upload can push sellers here; ATC flags read local + cloud (`RUGWATCH_WALLETS_URL` → index). Full guide: **RugCheck Documentation.md**.
+**Capacity:** about 100,000 wallets per local database file and per cloud file, then a new file is created automatically. See **EXTERNAL_STORAGE.md**.
+
+**Actual Token Checker:** Ruggers **Upload** can send sellers here; Analyze flags read local and/or cloud lists. Full guide: **RugCheck Documentation.md**.
 
 ---
 
@@ -152,58 +127,21 @@ python desktop_app.py
 
 - Not a full chain indexer — **sampling + heuristics**.  
 - Free RPCs will rate-limit; **Helius** is strongly recommended for deep scans.  
-- Pump.fun API paths change; creator resolve is best-effort.  
-- “Scam” labels are **risk scores**, not legal judgments.  
-- API quotas apply (Helius / optional paid APIs).
-
----
-
-## Separation from other projects
-
-| | RugWatch | Leonidas (other project) |
-|---|---|---|
-| Path | `C:\Users\levyr\RugWatch` | `C:\Users\levyr\GrokScreener` |
-| Purpose | Serial wallet DB + launch watch | Token research UI |
-| Database | `data/rugwatch.db` | `data/market.db` |
-| Config | `RugWatch\.env` | `GrokScreener\.env` |
-| Code | `rugwatch/` package only | `token_tracker/`, `desktop_app.py`, … |
-
-No Python imports cross the two trees. Keys may be *copied by you* into each `.env` if you want both apps to use Helius — still two separate files.
-
----
-
-## Privacy
-
-- All data stays **on your PC** (`data/rugwatch.db`).  
-- Do not share your `.env`.  
-- Share only code, never your DB if it has research notes you care about.
+- Launch data sources change over time; creator resolve is best-effort.  
+- Risk labels are heuristics, not legal judgments.
 
 ---
 
 ## Project layout
 
 ```text
-C:\Users\levyr\RugWatch\     ← this project only
+RugWatch/
   desktop_app.py
-  run_monitor.py
+  run_web.py
+  web/
   rugwatch/
-    cli.py
-    db.py
-    config.py
-    alerts.py
-    ingest/scan_mint.py
-    monitor/launches.py
-    sources/   # pumpfun, rugcheck, rpc, solscan
-  data/        # created at runtime
-  .env.example
+  data/          (created when you run the app)
   README.md
+  EXTERNAL_STORAGE.md
+  RugCheck Documentation.md
 ```
-
----
-
-## Later ideas
-
-- Continuous Windows service / tray icon  
-- Telegram alert bot  
-- Funding-graph clustering  
-- Optional export of alerts to a file for other tools (still no hard dependency)

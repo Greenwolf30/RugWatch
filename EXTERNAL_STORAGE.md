@@ -19,24 +19,24 @@ YourUser/RugWatch/                 ← whole project
 Local PC:
 
 ```text
-data/rugwatch.db                   ← primary local DB (not uploaded)
-data/rugwatch_002.db               ← auto-created when primary hits local max
-.env                               ← secrets only on your PC
+data/rugwatch.db                   ← primary local database
+data/rugwatch_002.db               ← created automatically when the primary fills
 ```
 
 ## Setup
 
-See **UPLOAD-RUGWATCH-TO-GITHUB.txt**
+See **UPLOAD-RUGWATCH-TO-GITHUB.txt** for connecting the project folder and cloud list to GitHub.
+
+Cloud capacity settings (defaults):
 
 ```text
 RUGWATCH_CLOUD=repo
 RUGWATCH_GITHUB_REPO=YourUser/RugWatch
-GITHUB_TOKEN=ghp_...
 RUGWATCH_CLOUD_SHARD_MAX=100000
 RUGWATCH_LOCAL_DB_MAX=100000
 ```
 
-Then (website: **Push cloud** / **Pull cloud**, or CLI):
+Then on the website use **Push cloud** / **Pull cloud**, or from a terminal:
 
 ```powershell
 python -m rugwatch cloud-init
@@ -44,9 +44,9 @@ python -m rugwatch push-cloud
 python -m rugwatch pull-cloud
 ```
 
-Working store is local multi-DB (`rugwatch.db` + overflow).  
-**Push cloud** packs all local wallets into shard files + `wallets_index.json`.  
-**Pull cloud** merges **every** listed cloud shard into local shards.
+Working store is the local multi-file database (`rugwatch.db` and overflow files).  
+**Push cloud** packs all local wallets into cloud files + `wallets_index.json`.  
+**Pull cloud** merges every listed cloud file into the local database.
 
 ---
 
@@ -87,14 +87,12 @@ Pills show **combined totals** across all local / cloud shards.
 | **~100,000 – few hundred thousand** | Multi-shard; Push/ATC slower but OK |
 | **~1M+** | Possible; expect heavy Push and ATC loads |
 
-ATC (Render) should use the **index** URL so it always loads every cloud shard:
+Actual Token Checker should use the **index** URL so it always loads every cloud file:
 
 ```text
 RUGWATCH_WALLETS_URL=https://raw.githubusercontent.com/YourUser/RugWatch/main/data/wallets_index.json
 ```
 
-### GitHub file-size note
+### Cloud file size
 
-Each cloud JSON is still a normal GitHub file (hard max ~100 MB).  
-With short notes, **100,000 wallets per shard** fits the design.  
-Very long notes may force earlier/smaller practical shards — lower `RUGWATCH_CLOUD_SHARD_MAX` if pushes time out.
+Each cloud JSON is a normal repository file. About **100,000 wallets per file** is the designed size. Very long notes can make each file larger, so keep notes short when possible.

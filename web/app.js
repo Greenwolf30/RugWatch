@@ -112,42 +112,8 @@
     }
   }
 
-  function escHtml(s) {
-    return String(s || "")
-      .replace(/&/g, "&amp;")
-      .replace(/</g, "&lt;")
-      .replace(/>/g, "&gt;")
-      .replace(/"/g, "&quot;");
-  }
-
-  function copyToClipboard(text) {
-    const t = String(text || "").trim();
-    if (!t) return Promise.reject(new Error("empty"));
-    if (navigator.clipboard && navigator.clipboard.writeText) {
-      return navigator.clipboard.writeText(t);
-    }
-    return new Promise((resolve, reject) => {
-      try {
-        const ta = document.createElement("textarea");
-        ta.value = t;
-        ta.setAttribute("readonly", "");
-        ta.style.position = "fixed";
-        ta.style.left = "-9999px";
-        document.body.appendChild(ta);
-        ta.select();
-        const ok = document.execCommand("copy");
-        document.body.removeChild(ta);
-        if (ok) resolve();
-        else reject(new Error("execCommand failed"));
-      } catch (e) {
-        reject(e);
-      }
-    });
-  }
-
   async function refreshWallets() {
     const box = $("walletsBox");
-    if (!box) return;
     try {
       const data = await apiGet("/api/wallets?limit=100");
       const rows = data.wallets || [];
@@ -156,72 +122,24 @@
           "No wallets yet.\nUse Add wallet, or Upload manual wallets (next to Add wallet).\n";
         return;
       }
-      // Left = scores only (not clickable). Right = address (click to copy) + notes.
-      box.innerHTML = rows
-        .map((w) => {
-          const score = String(w.risk_score != null ? w.risk_score : 0).padStart(3);
-          const times = "x" + (w.times_seen || 0);
-          const rawAddr = String(w.address || "").trim();
-          const addr = escHtml(rawAddr);
-          const label = escHtml(w.label || "");
-          const notes = escHtml(String(w.notes || "").slice(0, 80));
-          // data-copy uses raw address (not HTML-escaped entities)
-          const addrHtml = rawAddr
-            ? '<button type="button" class="w-addr" data-copy="' +
-              addr +
-              '" title="Click to copy address">' +
-              addr +
-              "</button>"
-            : '<span class="w-missing">(no address)</span>';
-          return (
-            '<div class="w-row" role="listitem">' +
-            '<div class="w-left w-nums">' +
-            escHtml(score) +
+      box.textContent = rows
+        .map(
+          (w) =>
+            String(w.risk_score).padStart(3) +
+            "  x" +
+            (w.times_seen || 0) +
             "  " +
-            escHtml(times) +
-            "</div>" +
-            '<div class="w-right">' +
-            addrHtml +
-            '<div class="w-meta">[' +
-            label +
+            (w.address || "") +
+            "\n     [" +
+            (w.label || "") +
             "] " +
-            notes +
-            "</div></div></div>"
-          );
-        })
-        .join("");
+            String(w.notes || "").slice(0, 80) +
+            "\n"
+        )
+        .join("\n");
     } catch (e) {
       box.textContent = "Error: " + e.message;
     }
-  }
-
-  /** Event delegation: only right-side .w-addr buttons copy */
-  function wireWalletCopyClicks() {
-    const box = $("walletsBox");
-    if (!box || box.dataset.copyWired === "1") return;
-    box.dataset.copyWired = "1";
-    box.addEventListener("click", (ev) => {
-      const a = ev.target && ev.target.closest ? ev.target.closest(".w-addr") : null;
-      if (!a || !box.contains(a)) return;
-      ev.preventDefault();
-      ev.stopPropagation();
-      const text = (a.getAttribute("data-copy") || a.textContent || "").trim();
-      if (!text) return;
-      copyToClipboard(text)
-        .then(() => {
-          log("Copied address: " + text.slice(0, 8) + "…");
-          const prev = a.textContent;
-          a.classList.add("copied");
-          a.textContent = "copied!";
-          setTimeout(() => {
-            a.textContent = prev;
-            a.classList.remove("copied");
-          }, 900);
-        })
-        .catch(() => {
-          alert("Copy failed — select and copy manually:\n" + text);
-        });
-    });
   }
 
   function formatAlertWeb(a) {
@@ -458,7 +376,6 @@
   }
 
   function wire() {
-    wireWalletCopyClicks();
     document.querySelectorAll(".tab").forEach((t) => {
       t.addEventListener("click", () => switchTab(t.dataset.tab));
     });
@@ -484,30 +401,6 @@
       });
     }
     $("btnAdd").addEventListener("click", () => doAdd());
-    // Mint field: left-click copies current value (if any)
-    if ($("mintInput")) {
-      $("mintInput").setAttribute("title", "Left-click to copy mint address");
-      $("mintInput").addEventListener("click", () => {
-        const el = $("mintInput");
-        const v = String(el.value || "").trim();
-        if (!v) return;
-        el.select();
-        const done = () => log("Copied mint: " + v.slice(0, 8) + "…");
-        if (navigator.clipboard && navigator.clipboard.writeText) {
-          navigator.clipboard.writeText(v).then(done).catch(() => {
-            try {
-              document.execCommand("copy");
-              done();
-            } catch (_) {}
-          });
-        } else {
-          try {
-            document.execCommand("copy");
-            done();
-          } catch (_) {}
-        }
-      });
-    }
     // Upload manual wallets is next to Add wallet (no Upload tab)
     if ($("fileInput")) {
       $("fileInput").addEventListener("change", async (ev) => {
@@ -526,18 +419,13 @@
       } catch (_) {}
     }
 
-    log("RugWatch web ready. Keys stay on the server (.env).");
+    log("RugWatch web ready.");
     log("Tabs: Log · Wallets · Alerts. Upload manual wallets is next to Add wallet.");
     apiGet("/api/health")
       .then((h) => {
-        log(
-          "Health OK · providers=" +
-            JSON.stringify(h.providers_configured || {}) +
-            " · site_token_required=" +
-            !!h.site_token_required
-        );
+        log("Health OK");
         if (h.site_token_required) {
-          log("Server requires X-API-Token — enter Site passcode (WEB_API_TOKEN).");
+          log("Site passcode required — enter it in the field above.");
         }
       })
       .catch((e) => log("Health error: " + e.message));
