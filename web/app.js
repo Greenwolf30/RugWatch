@@ -372,13 +372,28 @@
     const status = $("uploadStatus");
     try {
       const data = await apiPost("/api/upload", { text: text });
-      const msg =
+      const imp = data.imported ?? 0;
+      const skipEx = data.skipped_existing ?? 0;
+      const skip = data.skipped ?? 0;
+      let msg =
         "Imported " +
-        (data.imported ?? 0) +
-        " wallet(s)" +
-        (data.skipped != null ? " (skipped " + data.skipped + ")" : "") +
+        imp +
+        " new wallet(s)" +
+        (skipEx
+          ? " · skipped " + skipEx + " already in DB/cloud"
+          : skip
+            ? " · skipped " + skip
+            : "") +
         " · " +
         label;
+      if (imp === 0 && skipEx > 0) {
+        msg =
+          "No new wallets — all " +
+          skipEx +
+          " already in local DB and/or cloud (duplicates ignored) · " +
+          label;
+      }
+      if (data.note) msg += " · " + data.note;
       if (status) {
         status.hidden = false;
         status.textContent = msg;

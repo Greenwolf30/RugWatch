@@ -122,12 +122,15 @@ def pull_remote_into_db(
         items = fetch_wallets_from_url(u)
     except Exception as exc:  # noqa: BLE001
         return {"ok": False, "error": str(exc), "imported": 0, "url": u}
-    stats = db.import_wallets(items, source_default="remote_url")
+    stats = db.import_wallets(
+        items, source_default="remote_url", skip_existing=True
+    )
     return {
         "ok": True,
         "url": u,
         "imported": stats["imported"],
         "skipped": stats["skipped"],
+        "skipped_existing": stats.get("skipped_existing", 0),
         "db_wallets": db.stats().get("wallets"),
     }
 
@@ -165,9 +168,27 @@ def import_wallets_from_file(path: str | Path, db: RugWatchDB | None = None) -> 
     if not items:
         items = parse_wallet_text(raw, source_default="import_file")
     if not items:
-        return {"ok": False, "path": str(p), "imported": 0, "skipped": 0, "error": "No wallets found in file"}
-    stats = db.import_wallets(items, source_default="import_file")
-    return {"ok": True, "path": str(p), **stats}
+        return {
+            "ok": False,
+            "path": str(p),
+            "imported": 0,
+            "skipped": 0,
+            "error": "No wallets found in file",
+        }
+    also_skip: set[str] = set()
+    try:
+        from .cloud_store import fetch_cloud_address_set
+
+        also_skip = fetch_cloud_address_set()
+    except Exception:  # noqa: BLE001
+        also_skip = set()
+    stats = db.import_wallets(
+        items,
+        source_default="import_file",
+        skip_existing=True,
+        also_skip=also_skip,
+    )
+    return {"ok": True, "path": str(p), **stats, "cloud_known": len(also_skip)}
 
 
 def import_wallets_from_text(
@@ -175,11 +196,34 @@ def import_wallets_from_text(
     db: RugWatchDB | None = None,
     *,
     source_default: str = "manual_upload",
+    skip_existing: bool = True,
+    check_cloud: bool = True,
 ) -> dict[str, Any]:
-    """Import wallets from paste box (JSON or plain addresses)."""
+    """Import wallets from paste box (JSON or plain addresses). Duplicates ignored."""
     db = db or RugWatchDB()
     items = parse_wallet_text(raw, source_default=source_default)
     if not items:
-        return {"ok": False, "imported": 0, "skipped": 0, "error": "No wallet addresses found"}
-    stats = db.import_wallets(items, source_default=source_default)
-    return {"ok": True, **stats}
+        return {
+            "ok": False,
+            "imported": 0,
+            "skipped": 0,
+            "error": "No wallet addresses found",
+        }
+    also_skip: set[str] = set()
+    if check_cloud:
+        try:
+            from .cloud_store import fetch_cloud_address_set
+
+            also_skip = fetch_cloud_address_set()
+        except Exception:  # noqa: BLE001
+            also_skip = set()
+    stats = db.import_wallets(
+        items,
+        source_default=source_default,
+        skip_existing=skip_existing,
+        also_skip=also_skip,
+    )
+    out: dict[str, Any] = {"ok": True, **stats, "cloud_known": len(also_skip)}
+    if (stats.get("imported") or 0) == 0 and (stats.get("skipped_existing") or 0) > 0:
+        out["note"] = "No new wallets — all already in local DB and/or cloud."
+    return out

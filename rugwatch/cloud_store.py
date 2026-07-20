@@ -266,6 +266,18 @@ def push_to_repo(db: RugWatchDB | None = None) -> dict[str, Any]:
     """
     db = db or RugWatchDB()
     wallets = db.export_wallets(min_score=0)
+    # Deduplicate by address (keep highest risk_score) — no duplicate cloud entries
+    by_addr: dict[str, dict[str, Any]] = {}
+    for w in wallets:
+        if not isinstance(w, dict):
+            continue
+        a = (w.get("address") or "").strip()
+        if not a:
+            continue
+        prev = by_addr.get(a)
+        if prev is None or int(w.get("risk_score") or 0) >= int(prev.get("risk_score") or 0):
+            by_addr[a] = w
+    wallets = list(by_addr.values())
     # Stable order so re-push packs deterministically
     wallets.sort(key=lambda w: str(w.get("address") or ""))
     max_n = config.cloud_shard_max()
@@ -653,6 +665,77 @@ def cloud_status() -> dict[str, Any]:
             else "Gist is a separate cloud object; use mode=repo to keep everything together."
         ),
     }
+
+
+def fetch_cloud_address_set() -> set[str]:
+    """
+    All wallet addresses currently in the cloud store (repo shards or gist).
+    Used to ignore upload of wallets that already exist in cloud even if local
+    DB was wiped (free Render) or is empty.
+    Returns empty set if cloud is off / unreachable (caller still checks local).
+    """
+    mode = cloud_mode()
+    addrs: set[str] = set()
+    if mode == "off":
+        return addrs
+
+    def _absorb(items: list[dict[str, Any]]) -> None:
+        for it in items or []:
+            if not isinstance(it, dict):
+                continue
+            a = (it.get("address") or it.get("wallet") or "").strip()
+            if a and len(a) >= 32:
+                addrs.add(a)
+
+    try:
+        if mode == "repo":
+            if not github_token() or not github_repo():
+                return addrs
+            index_path = config.cloud_index_path()
+            index = _get_repo_file_json(index_path)
+            paths: list[str] = []
+            if isinstance(index, dict) and index.get("format") == "rugwatch_wallets_index_v1":
+                for s in index.get("shards") or []:
+                    if isinstance(s, dict) and s.get("path"):
+                        paths.append(str(s["path"]))
+            if not paths:
+                paths = [github_wallets_path()]
+            for path in paths:
+                parsed = _get_repo_file_json(path)
+                if parsed is None:
+                    continue
+                _absorb(parse_wallet_payload(parsed))
+            return addrs
+
+        # gist / raw URL fallback
+        raw_url = config.wallets_remote_url()
+        if mode == "gist" and gist_id() and github_token():
+            try:
+                data = _request_json("GET", f"{GIST_API}/{gist_id()}")
+                files = data.get("files") or {}
+                fname = gist_filename()
+                content = ""
+                if fname in files:
+                    content = (files[fname] or {}).get("content") or ""
+                else:
+                    for meta in files.values():
+                        content = (meta or {}).get("content") or ""
+                        if content:
+                            break
+                if content.strip():
+                    _absorb(parse_wallet_payload(json.loads(content)))
+            except Exception:  # noqa: BLE001
+                pass
+        elif raw_url:
+            try:
+                from .remote_wallets import fetch_wallets_from_url
+
+                _absorb(fetch_wallets_from_url(raw_url))
+            except Exception:  # noqa: BLE001
+                pass
+    except Exception:  # noqa: BLE001
+        return addrs
+    return addrs
 
 
 def fetch_cloud_wallet_count() -> dict[str, Any]:

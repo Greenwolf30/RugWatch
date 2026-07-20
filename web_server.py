@@ -454,7 +454,34 @@ class RugWatchHandler(BaseHTTPRequestHandler):
                 items = parse_wallet_payload(body.get("wallets"))
             text = body.get("text") or body.get("raw") or ""
             if not items and text:
-                r = import_wallets_from_text(str(text), db, source_default="web_upload")
+                r = import_wallets_from_text(
+                    str(text),
+                    db,
+                    source_default="web_upload",
+                    skip_existing=True,
+                    check_cloud=True,
+                )
+                # Optional push after text upload if requested
+                push_flag = body.get("push_cloud")
+                if (
+                    r.get("ok")
+                    and (r.get("imported") or 0) > 0
+                    and (
+                        push_flag is True
+                        or str(push_flag).strip().lower() in {"1", "true", "yes", "on"}
+                    )
+                ):
+                    try:
+                        from rugwatch.cloud_store import push_to_cloud
+
+                        r["cloud"] = push_to_cloud(db)
+                    except Exception as exc:  # noqa: BLE001
+                        r["cloud"] = {"ok": False, "error": str(exc)}
+                elif r.get("ok") and (r.get("imported") or 0) == 0:
+                    r["note"] = (
+                        r.get("note")
+                        or "No new wallets — all already in local DB and/or cloud."
+                    )
                 self._json(200 if r.get("ok") else 400, r)
                 return
             if not items and isinstance(body.get("format"), str):
@@ -464,16 +491,40 @@ class RugWatchHandler(BaseHTTPRequestHandler):
                 self._json(400, {"ok": False, "error": "No wallets found", "imported": 0})
                 return
             src = str(body.get("source") or "web_upload")
-            stats = db.import_wallets(items, source_default=src)
-            out: dict[str, Any] = {"ok": True, **stats, "db_wallets": db.stats().get("wallets")}
+            # Skip addresses already in local DB or cloud — no duplicate wallets
+            also_skip: set[str] = set()
+            try:
+                from rugwatch.cloud_store import fetch_cloud_address_set
+
+                also_skip = fetch_cloud_address_set()
+            except Exception:  # noqa: BLE001
+                also_skip = set()
+            stats = db.import_wallets(
+                items,
+                source_default=src,
+                skip_existing=True,
+                also_skip=also_skip,
+            )
+            out: dict[str, Any] = {
+                "ok": True,
+                **stats,
+                "db_wallets": db.stats().get("wallets"),
+                "cloud_known": len(also_skip),
+            }
+            if (stats.get("imported") or 0) == 0:
+                out["note"] = (
+                    "No new wallets — all already in local DB and/or cloud "
+                    f"(skipped existing: {stats.get('skipped_existing') or 0})."
+                )
             # ATC Ruggers "Upload" sends push_cloud=true to grow the GitHub cloud list
             push_flag = body.get("push_cloud")
-            if push_flag is True or str(push_flag).strip().lower() in {
+            want_push = push_flag is True or str(push_flag).strip().lower() in {
                 "1",
                 "true",
                 "yes",
                 "on",
-            }:
+            }
+            if want_push and (stats.get("imported") or 0) > 0:
                 try:
                     from rugwatch.cloud_store import push_to_cloud
 
@@ -491,6 +542,26 @@ class RugWatchHandler(BaseHTTPRequestHandler):
                         out["cloud_error"] = pr.get("error")
                 except Exception as exc:  # noqa: BLE001
                     out["cloud"] = {"ok": False, "error": str(exc)}
+            elif want_push:
+                # Nothing new — still report current cloud size without re-writing
+                try:
+                    from rugwatch.cloud_store import fetch_cloud_wallet_count
+
+                    cc = fetch_cloud_wallet_count()
+                    out["cloud"] = {
+                        "ok": True,
+                        "skipped_push": True,
+                        "wallet_count": cc.get("count"),
+                        "cloud_shards": cc.get("cloud_shards"),
+                        "note": "Push skipped — no new wallets to add.",
+                    }
+                except Exception as exc:  # noqa: BLE001
+                    out["cloud"] = {
+                        "ok": True,
+                        "skipped_push": True,
+                        "error": str(exc),
+                        "note": "Push skipped — no new wallets to add.",
+                    }
             self._json(200, out)
             return
 

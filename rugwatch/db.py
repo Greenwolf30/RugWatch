@@ -690,25 +690,70 @@ class RugWatchDB:
             )
         return out
 
+    def wallet_exists(self, address: str) -> bool:
+        """True if address is already in any local DB shard."""
+        return self._find_wallet_shard((address or "").strip()) is not None
+
+    def known_local_addresses(self) -> set[str]:
+        """All wallet addresses currently stored across local shards."""
+        out: set[str] = set()
+        for p in self.shard_paths():
+            try:
+                with self.connect(p) as conn:
+                    for row in conn.execute("SELECT address FROM wallets"):
+                        a = (row[0] or "").strip()
+                        if a:
+                            out.add(a)
+            except sqlite3.Error:
+                continue
+        return out
+
     def import_wallets(
         self,
         items: list[dict[str, Any]],
         *,
         source_default: str = "import",
+        skip_existing: bool = True,
+        also_skip: set[str] | None = None,
     ) -> dict[str, int]:
-        """Merge wallet dicts (manual / remote). Only upserts wallets — no auto scan."""
+        """
+        Import wallet dicts (manual upload / Ruggers / remote).
+
+        skip_existing=True (default): do not insert or update addresses already
+        in the local multi-DB. Prevents duplicate wallets and note spam.
+
+        also_skip: extra addresses to treat as already known (e.g. cloud list)
+        so uploads that match cloud-only wallets are ignored too.
+        """
         added = 0
-        skipped = 0
+        skipped_invalid = 0
+        skipped_existing = 0
+        skipped_batch_dup = 0
+        also = {a.strip() for a in (also_skip or set()) if a and str(a).strip()}
+        seen_batch: set[str] = set()
+
         for it in items or []:
             if not isinstance(it, dict):
-                skipped += 1
+                skipped_invalid += 1
                 continue
             addr = (it.get("address") or it.get("wallet") or "").strip()
             if not addr or len(addr) < 32:
-                skipped += 1
+                skipped_invalid += 1
                 continue
+            if addr in seen_batch:
+                skipped_batch_dup += 1
+                continue
+            seen_batch.add(addr)
+
+            if skip_existing:
+                if addr in also or self.wallet_exists(addr):
+                    skipped_existing += 1
+                    continue
+
             try:
-                score = int(it.get("risk_score") if it.get("risk_score") is not None else 70)
+                score = int(
+                    it.get("risk_score") if it.get("risk_score") is not None else 70
+                )
             except (TypeError, ValueError):
                 score = 70
             self.upsert_wallet(
@@ -718,6 +763,17 @@ class RugWatchDB:
                 risk_score=score,
                 notes=str(it.get("notes") or "imported"),
                 source=str(it.get("source") or source_default),
+                bump_seen=True,
             )
             added += 1
-        return {"imported": added, "skipped": skipped}
+            # Newly added — treat as known for rest of batch / also_skip
+            also.add(addr)
+
+        skipped = skipped_invalid + skipped_existing + skipped_batch_dup
+        return {
+            "imported": added,
+            "skipped": skipped,
+            "skipped_existing": skipped_existing,
+            "skipped_invalid": skipped_invalid,
+            "skipped_batch_dup": skipped_batch_dup,
+        }
