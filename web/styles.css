@@ -67,27 +67,6 @@ body {
   margin: 0;
   font-size: 1.45rem;
 }
-.pull-limit-lab {
-  display: inline-flex;
-  flex-direction: column;
-  gap: 2px;
-  font-size: 0.72rem;
-  color: var(--muted);
-  font-weight: 600;
-}
-.pull-limit-input {
-  width: 5.5rem;
-  background: var(--entry);
-  border: 1px solid var(--border);
-  color: var(--fg);
-  border-radius: 7px;
-  padding: 7px 8px;
-  font-size: 0.84rem;
-}
-.pull-limit-input:focus {
-  outline: none;
-  border-color: rgba(201, 162, 39, 0.55);
-}
 .nav-links { display: flex; gap: 4px; align-items: center; }
 .nav-link {
   color: var(--muted);

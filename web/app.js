@@ -326,30 +326,80 @@
     }
   }
 
-  function parsePullLimit() {
-    const el = $("pullLimitInput");
-    const raw = el ? String(el.value || "").trim() : "";
-    if (!raw || /^(all|\*|full|everything)$/i.test(raw)) {
-      return { max_wallets: "all" };
+  /**
+   * Pull cloud flow (no permanent input bar):
+   * 1) Warn about large pulls (>100k / small machines)
+   * 2) Ask how many wallets (number or "all")
+   * 3) Confirm, then pull
+   */
+  function promptPullLimit() {
+    window.alert(
+      "Pull cloud warning\n\n" +
+        "Cloud lists can be large. Pulling over ~100,000 wallets can slow or freeze a small machine " +
+        "or a nearly full hard drive (RAM during download/import + disk for the local DB).\n\n" +
+        "• Prefer a limited number if you are unsure.\n" +
+        "• Type all only if you have enough free RAM and disk.\n\n" +
+        "Next you will choose how many wallets to pull."
+    );
+
+    const raw = window.prompt(
+      "How many wallets do you want to pull from the cloud?\n\n" +
+        "• Enter a positive number (e.g. 500 or 10000)\n" +
+        "• Or type all to pull every shard\n\n" +
+        "Cancel aborts the pull.",
+      "all"
+    );
+    if (raw == null) {
+      return null; // cancelled
     }
-    const n = parseInt(raw, 10);
+    const s = String(raw).trim();
+    if (!s || /^(all|\*|full|everything)$/i.test(s)) {
+      return { max_wallets: "all", label: "all" };
+    }
+    const n = parseInt(s, 10);
     if (!Number.isFinite(n) || n <= 0) {
-      throw new Error("Pull count must be a positive number or leave blank / type all");
+      window.alert("Invalid amount. Enter a positive number or all.");
+      return null;
     }
-    return { max_wallets: n };
+    if (n > 100000) {
+      const okBig = window.confirm(
+        "You asked for " +
+          n.toLocaleString() +
+          " wallets (over 100,000).\n\n" +
+          "This can stress a small machine or overloaded hard drive.\n\n" +
+          "Continue with this amount?"
+      );
+      if (!okBig) return null;
+    }
+    return { max_wallets: n, label: String(n) };
   }
 
   async function doPullCloud() {
-    let body;
-    try {
-      body = parsePullLimit();
-    } catch (e) {
-      alert(e.message || String(e));
+    const choice = promptPullLimit();
+    if (!choice) {
+      log("Pull cloud cancelled.");
       return;
     }
-    const lim =
-      body.max_wallets === "all" ? "all" : String(body.max_wallets);
-    log("Pull cloud… (limit=" + lim + ")");
+
+    const limLabel = choice.label;
+    const confirmMsg =
+      choice.max_wallets === "all"
+        ? "Pull ALL wallets from cloud into the local database?\n\n" +
+          "This may take a while if the cloud list is large.\n\nContinue?"
+        : "Pull up to " +
+          Number(choice.max_wallets).toLocaleString() +
+          " wallet(s) from cloud into the local database?\n\nContinue?";
+    if (!window.confirm(confirmMsg)) {
+      log("Pull cloud cancelled (confirm).");
+      return;
+    }
+
+    const body =
+      choice.max_wallets === "all"
+        ? { max_wallets: "all" }
+        : { max_wallets: choice.max_wallets };
+
+    log("Pull cloud… (limit=" + limLabel + ")");
     try {
       const data = await apiPost("/api/pull-cloud", body);
       log(
