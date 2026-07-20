@@ -140,24 +140,6 @@ def run_gui() -> None:
     )
     mint_entry.pack(side="left", fill="x", expand=True, ipady=7, padx=(0, 10))
 
-    def _copy_mint_field(_event: Any = None) -> None:
-        v = mint_var.get().strip()
-        if not v:
-            return
-        try:
-            root.clipboard_clear()
-            root.clipboard_append(v)
-            root.update_idletasks()
-            # log may not exist yet at bind time if called early — safe after GUI fully built
-            try:
-                log(f"Copied mint: {v[:8]}…")  # type: ignore[name-defined]
-            except Exception:  # noqa: BLE001
-                pass
-        except Exception:  # noqa: BLE001
-            pass
-
-    mint_entry.bind("<Button-1>", lambda e: (mint_entry.after(1, _copy_mint_field), None)[-1])
-
     deep_var = tk.BooleanVar(value=True)
     tk.Checkbutton(
         mint_row,
@@ -582,6 +564,29 @@ def run_gui() -> None:
         )
         refresh_all()
         refresh_cloud_count()
+
+    def copy_mint_field() -> None:
+        v = mint_var.get().strip()
+        if not v:
+            messagebox.showinfo(__app_name__, "Mint field is empty.\nPaste a mint first, then copy.")
+            return
+        try:
+            root.clipboard_clear()
+            root.clipboard_append(v)
+            root.update()
+            log(f"Copied mint: {v[:12]}…")
+        except Exception as exc:  # noqa: BLE001
+            messagebox.showerror(__app_name__, f"Copy failed:\n{exc}")
+
+    def _on_mint_click(_event: Any = None) -> None:
+        # Copy after click so the entry can focus; only if field has text
+        if mint_var.get().strip():
+            root.after(10, copy_mint_field)
+
+    mint_entry.bind("<ButtonRelease-1>", _on_mint_click)
+    ttk.Button(mint_row, text="Copy mint", command=copy_mint_field).pack(
+        side="left", padx=(0, 8)
+    )
 
     ttk.Button(btn_row, text="Scan mint", style="Accent.TButton", command=do_scan).pack(
         side="left", padx=(0, 6)

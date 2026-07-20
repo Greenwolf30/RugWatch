@@ -420,32 +420,61 @@
       });
     }
     $("btnAdd").addEventListener("click", () => doAdd());
-    // Mint field: left-click copies the address when present
-    if ($("mintInput")) {
+
+    function copyMintField() {
       const mintEl = $("mintInput");
-      mintEl.setAttribute("title", "Left-click to copy mint address");
-      mintEl.addEventListener("click", () => {
-        const v = String(mintEl.value || "").trim();
-        if (!v) return;
-        mintEl.select();
-        const done = () => log("Copied mint: " + v.slice(0, 8) + "…");
-        if (navigator.clipboard && navigator.clipboard.writeText) {
-          navigator.clipboard.writeText(v).then(done).catch(() => {
-            try {
-              document.execCommand("copy");
-              done();
-            } catch (_) {
-              alert("Copy failed:\n" + v);
-            }
-          });
-        } else {
-          try {
-            document.execCommand("copy");
-            done();
-          } catch (_) {
-            alert("Copy failed:\n" + v);
-          }
+      if (!mintEl) return;
+      const v = String(mintEl.value || "").trim();
+      if (!v) {
+        alert("Mint field is empty.\n\nPaste a mint address first, then click Copy mint (or click the field).");
+        return;
+      }
+      mintEl.focus();
+      mintEl.select();
+      const done = () => {
+        log("Copied mint: " + v.slice(0, 12) + "…");
+        const btn = $("btnCopyMint");
+        if (btn) {
+          const prev = btn.textContent;
+          btn.textContent = "Copied!";
+          setTimeout(() => {
+            btn.textContent = prev || "Copy mint";
+          }, 1000);
         }
+      };
+      const fail = () => {
+        // last resort: show address so user can copy
+        window.prompt("Copy this mint address (Ctrl+C):", v);
+      };
+      const tryExec = () => {
+        try {
+          const ok = document.execCommand("copy");
+          if (ok) done();
+          else fail();
+        } catch (_) {
+          fail();
+        }
+      };
+      if (navigator.clipboard && window.isSecureContext !== false) {
+        navigator.clipboard.writeText(v).then(done).catch(tryExec);
+      } else {
+        tryExec();
+      }
+    }
+
+    // Left-click mint field → copy (when it has a value)
+    if ($("mintInput")) {
+      $("mintInput").addEventListener("click", (ev) => {
+        const v = String($("mintInput").value || "").trim();
+        if (!v) return; // empty: allow normal focus to type
+        // Delay so click finishes selecting in the field
+        setTimeout(copyMintField, 0);
+      });
+    }
+    if ($("btnCopyMint")) {
+      $("btnCopyMint").addEventListener("click", (ev) => {
+        ev.preventDefault();
+        copyMintField();
       });
     }
     // Upload manual wallets is next to Add wallet (no Upload tab)
