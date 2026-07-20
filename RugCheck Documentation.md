@@ -68,10 +68,11 @@ Everything is **local by default** (`data/rugwatch.db`). Cloud only talks to **y
 |---|---|
 | **Built app** | Double-click `C:\Users\levyr\RugWatch\dist\RugWatch\RugWatch.exe` |
 | **From source** | In the RugWatch folder: `python desktop_app.py` |
-| **Website** | In the RugWatch folder: `python run_web.py` → http://127.0.0.1:8787/ |
+| **Website** | In the RugWatch folder: `python run_web.py --port 8790` → http://127.0.0.1:8790/ |
 
 On first open you should see:
 
+- Website top nav: **RugWatch** brand · **Docs** · **GitHub** (Docs opens `/docs.html`)
 - Title bar: **RugWatch · wallets N · logged N · cloud N**
 - Header pills (top right): green **wallets**, gold **logged**, blue **cloud**
 - Status line: In DB now · Lifetime logged · Cloud now · high_risk · incidents · alerts
@@ -82,6 +83,8 @@ On first open you should see:
 The **Log** tab prints a ready message and storage / cloud status.
 
 The website shows the same three pills (**wallets · logged · cloud**), tabs **Log · Wallets · Alerts** only, multi-line alerts with full mint + links, and **Upload manual wallets** next to **Add wallet**.
+
+**Docs page:** http://127.0.0.1:8790/docs.html — short on-site guide + links to full Markdown on GitHub.
 
 ---
 
@@ -545,12 +548,23 @@ Open **http://127.0.0.1:8787/**
 ### Website workflow → Actual Token Checker flags
 
 ```text
-1. python run_web.py  →  http://127.0.0.1:8787/
-2. Add / Upload wallets  →  local DB
-3. Push cloud            →  cloud wallet list updated
-4. Point ATC at that cloud list (when using ATC website/server)
-5. Analyze a mint on ATC →  Holders flags [cloud] / [local] / [both]
+1. python run_web.py --port 8790  →  http://127.0.0.1:8790/
+2. Add / Upload wallets  →  local DB (auto-shards at 100k wallets/file)
+3. Push cloud            →  wallets_cloud*.json + wallets_index.json
+4. Point ATC at index URL (Render RUGWATCH_WALLETS_URL)
+5. Analyze a mint on ATC (RugWatch checkbox ON) → Holders [local]/[cloud]/[both]
 ```
+
+**From ATC Ruggers (no hand-copy required):**
+
+```text
+ATC Ruggers → yellow Upload on Creator / Similar / Single
+  → POST RugWatch /api/upload (push_cloud=true)
+  → local DB import + Push cloud
+  → ATC cloud flags grow on next Analyze (after index updates)
+```
+
+RugWatch must be running at the URL ATC uses (`rugwatchUrl`, default port **8790**).
 
 Website and desktop share the **same** `data/rugwatch.db` when run from the same project folder.
 
@@ -579,26 +593,37 @@ Website and desktop share the **same** `data/rugwatch.db` when run from the same
 
 ### C. Day-to-day research with Actual Token Checker (local + cloud)
 
-ATC **reads** RugWatch — it does **not** write into RugWatch.
+ATC **reads** RugWatch for flags. Writing back into your list is optional:
 
-ATC merges **two** sources when building the Holders “FLAGGED WALLETS (RugWatch)” list:
+| Direction | How |
+|-----------|-----|
+| **RugWatch → ATC flags** | Always read-only merge (local DB shards + cloud URL) when ATC’s **RugWatch** checkbox is ON |
+| **ATC Ruggers → RugWatch** | Yellow **Upload** on Creator / Similar / Single (imports + Push cloud), or Export file |
 
-1. **Local** — `rugwatch.db` on this PC  
-2. **Cloud** — your pushed wallet JSON on GitHub (if configured)
+ATC merges **two** sources for Holders “FLAGGED WALLETS (RugWatch)”:
+
+1. **Local** — all `rugwatch.db` / `rugwatch_002.db`… shards found on that machine  
+2. **Cloud** — every shard listed in `wallets_index.json` (or a single `wallets_cloud.json`)
 
 ```text
-  RugWatch local DB  ──┐
-                       ├── merge (unique addresses) ──► ATC Holders flags
-  RugWatch cloud JSON ─┘     tags: [local] [cloud] [both]
+  RugWatch local shards  ──┐
+                           ├── merge ──► ATC Holders  tags: [local] [cloud] [both]
+  RugWatch cloud index   ─┘
 ```
 
-**Where ATC looks for the local DB (first match wins):**
+**Where ATC looks for local DBs:**
 
-1. Env `RUGWATCH_DB` (full path to `rugwatch.db`)  
+1. Env `RUGWATCH_DB` (primary path; siblings `_002` etc. are discovered next to it)  
 2. Sibling folder `../RugWatch/data/rugwatch.db`  
 3. `~/RugWatch/data/rugwatch.db`
 
-**Where ATC loads the cloud list:** from ATC’s own server/app configuration (wallet list URL or linked cloud location). After you **Push cloud** in RugWatch, ATC can flag wallets that exist **only on cloud**, **only local**, or **both** (shown as tags on each flagged line).
+**Where ATC loads the cloud list:** env `RUGWATCH_WALLETS_URL` on the ATC server (Render). Prefer:
+
+```text
+https://raw.githubusercontent.com/YourUser/RugWatch/main/data/wallets_index.json
+```
+
+On **Render**, flags are usually **[cloud]** only (no local DB). On **your PC**, can be **both**.
 
 **A flag only appears in ATC if:**
 
@@ -606,9 +631,9 @@ ATC merges **two** sources when building the Holders “FLAGGED WALLETS (RugWatc
 |---|---|
 | Wallet is in **local DB and/or cloud list** | Scan suggestions alone are not saved |
 | Address shows up in ATC’s holder / creator view | Must appear in the data ATC is building |
-| Score meets any min filter ATC applies | Very low scores may be ignored |
+| RugWatch checkbox is **ON** | Unchecked = skip flagged merge for that Analyze |
 
-What this does **not** do: auto-add from ATC into RugWatch; share one multi-user police DB for everyone (cloud is **your** list).
+What this does **not** do: share one multi-user police DB for everyone (cloud is **your** GitHub list).
 
 ### D. New PC or reinstall
 

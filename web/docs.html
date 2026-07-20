@@ -55,10 +55,22 @@
       </section>
 
       <section class="docs-card">
+        <h2>Local vs cloud (who uses what)</h2>
+        <ul>
+          <li><strong>RugWatch</strong> Scan / Monitor / Wallets pill → <strong>local DB</strong> (all shards)</li>
+          <li><strong>Push cloud</strong> → GitHub index + shard files (source ATC reads on Render)</li>
+          <li><strong>ATC</strong> flags → merges <strong>local + cloud</strong> when available; tags [local] [cloud] [both]</li>
+          <li>On Render ATC, usually <strong>cloud only</strong> via <code>RUGWATCH_WALLETS_URL</code></li>
+        </ul>
+      </section>
+
+      <section class="docs-card">
         <h2>From Actual Token Checker</h2>
         <ul>
+          <li>Top nav yellow <strong>RugWatch</strong> tab opens this site</li>
+          <li>Analyze checkbox <strong>RugWatch</strong> includes/skips flagged wallets</li>
           <li>Ruggers tab → yellow <strong>Upload</strong> on Creator / Similar / Single</li>
-          <li>Sends wallets here and <strong>Push cloud</strong> (RugWatch must be running)</li>
+          <li>Upload imports here and <strong>Push cloud</strong> (this site must be running)</li>
           <li>Or Export JSON and use <strong>Upload manual wallets</strong> on this site</li>
         </ul>
       </section>

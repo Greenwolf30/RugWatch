@@ -35,6 +35,11 @@ Edit `.env`:
 
 ```env
 HELIUS_API_KEY=your_key_here
+RUGWATCH_CLOUD=repo
+RUGWATCH_GITHUB_REPO=YourUser/RugWatch
+GITHUB_TOKEN=ghp_...
+RUGWATCH_CLOUD_SHARD_MAX=100000
+RUGWATCH_LOCAL_DB_MAX=100000
 ```
 
 Optional: `SOLSCAN_API_KEY`, `BIRDEYE_API_KEY`, `RUGWATCH_POLL_SECONDS=45`
@@ -42,7 +47,13 @@ Optional: `SOLSCAN_API_KEY`, `BIRDEYE_API_KEY`, `RUGWATCH_POLL_SECONDS=45`
 ```text
 pip install -r requirements.txt
 python -m rugwatch init-db
+python run_web.py --port 8790
+# open http://127.0.0.1:8790/  ·  Docs: /docs.html
 ```
+
+**Capacity:** 100k wallets per local DB file and per cloud JSON file, then auto-shard (`rugwatch_002.db`, `wallets_cloud_002.json` + `wallets_index.json`). See **EXTERNAL_STORAGE.md**.
+
+**ATC:** Ruggers yellow Upload can push sellers here; ATC flags read local + cloud (`RUGWATCH_WALLETS_URL` → index). Full guide: **RugCheck Documentation.md**.
 
 ---
 
