@@ -324,6 +324,21 @@ class RugWatchHandler(BaseHTTPRequestHandler):
             except ValueError:
                 limit = 100
             db = RugWatchDB()
+            # If local DB empty but GitHub cloud has wallets, pull once (free Render disk).
+            try:
+                if (db.stats().get("wallets") or 0) == 0:
+                    from rugwatch.cloud_store import (
+                        cloud_enabled,
+                        ensure_cloud_cache,
+                        fetch_cloud_wallet_count,
+                    )
+
+                    if cloud_enabled():
+                        cc = fetch_cloud_wallet_count()
+                        if cc.get("ok") and (cc.get("count") or 0) > 0:
+                            ensure_cloud_cache(db)
+            except Exception:  # noqa: BLE001
+                pass
             rows = db.list_wallets(min_score=min_score, limit=limit)
             mint_map = db.wallet_mint_map()
             wallets_out = []
@@ -582,6 +597,25 @@ class RugWatchHandler(BaseHTTPRequestHandler):
         self._json(404, {"ok": False, "error": "unknown endpoint"})
 
 
+def _boot_pull_cloud() -> None:
+    """Load GitHub cloud wallets into local DB (same as desktop). Critical on free Render."""
+    try:
+        from rugwatch.cloud_store import ensure_cloud_cache
+
+        r = ensure_cloud_cache(RugWatchDB())
+        if r.get("skipped"):
+            print(f"Cloud boot skipped: {r.get('error') or r}")
+        elif r.get("ok"):
+            print(
+                "Cloud boot ok: imported="
+                f"{r.get('imported')} action={r.get('action') or r.get('gist_id') or 'pull'}"
+            )
+        else:
+            print(f"Cloud boot issue: {r.get('error') or r}")
+    except Exception as exc:  # noqa: BLE001
+        print(f"Cloud boot failed: {exc}", file=sys.stderr)
+
+
 def main(argv: list[str] | None = None) -> int:
     load_dotenv()
     # Render / cloud: PORT is set → bind all interfaces unless WEB_HOST overrides
@@ -598,6 +632,9 @@ def main(argv: list[str] | None = None) -> int:
     if not WEB_DIR.is_dir():
         print(f"Missing web UI folder: {WEB_DIR}", file=sys.stderr)
         return 1
+
+    # Free Render wipes local SQLite on restart — rehydrate from GitHub cloud.
+    _boot_pull_cloud()
 
     httpd = ThreadingHTTPServer((args.host, args.port), RugWatchHandler)
     print(f"{__app_name__} web  http://{args.host}:{args.port}/")

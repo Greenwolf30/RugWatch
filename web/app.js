@@ -128,7 +128,9 @@
       const rows = data.wallets || [];
       if (!rows.length) {
         box.textContent =
-          "No wallets yet.\nUse Add wallet, or Upload manual wallets (next to Add wallet).\n";
+          "No wallets in local list yet.\n" +
+          "If cloud pill shows wallets, click Pull cloud (or wait for auto-pull after deploy).\n" +
+          "Or use Add wallet / Upload.\n";
         return;
       }
       // Simple list: yellow scores · red wallet/notes (no copy handlers)
