@@ -476,6 +476,30 @@
       });
     }
     $("btnAdd").addEventListener("click", () => doAdd());
+    // Mint field: left-click copies current value (if any)
+    if ($("mintInput")) {
+      $("mintInput").setAttribute("title", "Left-click to copy mint address");
+      $("mintInput").addEventListener("click", () => {
+        const el = $("mintInput");
+        const v = String(el.value || "").trim();
+        if (!v) return;
+        el.select();
+        const done = () => log("Copied mint: " + v.slice(0, 8) + "…");
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(v).then(done).catch(() => {
+            try {
+              document.execCommand("copy");
+              done();
+            } catch (_) {}
+          });
+        } else {
+          try {
+            document.execCommand("copy");
+            done();
+          } catch (_) {}
+        }
+      });
+    }
     // Upload manual wallets is next to Add wallet (no Upload tab)
     if ($("fileInput")) {
       $("fileInput").addEventListener("change", async (ev) => {
