@@ -281,20 +281,31 @@ body {
   pointer-events: none;
   text-align: right;
 }
-#walletsBox a.w-addr {
+#walletsBox button.w-addr,
+#walletsBox .w-addr {
   display: inline-block;
+  max-width: 100%;
   color: #c98a8a;
+  background: transparent;
+  border: none;
+  padding: 0;
+  margin: 0;
+  font: inherit;
+  font-family: var(--mono);
   text-decoration: underline;
   text-underline-offset: 2px;
   cursor: pointer;
   font-weight: 500;
   pointer-events: auto;
   text-align: right;
+  word-break: break-all;
 }
-#walletsBox a.w-addr:hover {
+#walletsBox button.w-addr:hover,
+#walletsBox .w-addr:hover {
   color: #d9a0a0;
 }
-#walletsBox a.w-addr.copied {
+#walletsBox button.w-addr.copied,
+#walletsBox .w-addr.copied {
   color: #6aab80;
   text-decoration: none;
 }

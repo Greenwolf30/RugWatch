@@ -120,8 +120,34 @@
       .replace(/"/g, "&quot;");
   }
 
+  function copyToClipboard(text) {
+    const t = String(text || "").trim();
+    if (!t) return Promise.reject(new Error("empty"));
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      return navigator.clipboard.writeText(t);
+    }
+    return new Promise((resolve, reject) => {
+      try {
+        const ta = document.createElement("textarea");
+        ta.value = t;
+        ta.setAttribute("readonly", "");
+        ta.style.position = "fixed";
+        ta.style.left = "-9999px";
+        document.body.appendChild(ta);
+        ta.select();
+        const ok = document.execCommand("copy");
+        document.body.removeChild(ta);
+        if (ok) resolve();
+        else reject(new Error("execCommand failed"));
+      } catch (e) {
+        reject(e);
+      }
+    });
+  }
+
   async function refreshWallets() {
     const box = $("walletsBox");
+    if (!box) return;
     try {
       const data = await apiGet("/api/wallets?limit=100");
       const rows = data.wallets || [];
@@ -139,16 +165,17 @@
           const addr = escHtml(rawAddr);
           const label = escHtml(w.label || "");
           const notes = escHtml(String(w.notes || "").slice(0, 80));
+          // data-copy uses raw address (not HTML-escaped entities)
           const addrHtml = rawAddr
-            ? '<a href="#" class="w-addr" data-copy="' +
+            ? '<button type="button" class="w-addr" data-copy="' +
               addr +
-              '" title="Click to copy wallet address">' +
+              '" title="Click to copy address">' +
               addr +
-              "</a>"
+              "</button>"
             : '<span class="w-missing">(no address)</span>';
           return (
-            '<div class="w-row">' +
-            '<div class="w-left w-nums" aria-hidden="false">' +
+            '<div class="w-row" role="listitem">' +
+            '<div class="w-left w-nums">' +
             escHtml(score) +
             "  " +
             escHtml(times) +
@@ -163,20 +190,25 @@
           );
         })
         .join("");
-      wireWalletCopyClicks(box);
     } catch (e) {
       box.textContent = "Error: " + e.message;
     }
   }
 
-  function wireWalletCopyClicks(box) {
-    if (!box) return;
-    box.querySelectorAll("a.w-addr").forEach((a) => {
-      a.addEventListener("click", (ev) => {
-        ev.preventDefault();
-        const text = a.getAttribute("data-copy") || a.textContent || "";
-        if (!text) return;
-        const done = () => {
+  /** Event delegation: only right-side .w-addr buttons copy */
+  function wireWalletCopyClicks() {
+    const box = $("walletsBox");
+    if (!box || box.dataset.copyWired === "1") return;
+    box.dataset.copyWired = "1";
+    box.addEventListener("click", (ev) => {
+      const a = ev.target && ev.target.closest ? ev.target.closest(".w-addr") : null;
+      if (!a || !box.contains(a)) return;
+      ev.preventDefault();
+      ev.stopPropagation();
+      const text = (a.getAttribute("data-copy") || a.textContent || "").trim();
+      if (!text) return;
+      copyToClipboard(text)
+        .then(() => {
           log("Copied address: " + text.slice(0, 8) + "…");
           const prev = a.textContent;
           a.classList.add("copied");
@@ -185,36 +217,10 @@
             a.textContent = prev;
             a.classList.remove("copied");
           }, 900);
-        };
-        if (navigator.clipboard && navigator.clipboard.writeText) {
-          navigator.clipboard.writeText(text).then(done).catch(() => {
-            // fallback
-            try {
-              const ta = document.createElement("textarea");
-              ta.value = text;
-              document.body.appendChild(ta);
-              ta.select();
-              document.execCommand("copy");
-              document.body.removeChild(ta);
-              done();
-            } catch (_) {
-              alert("Copy failed — select and copy manually:\n" + text);
-            }
-          });
-        } else {
-          try {
-            const ta = document.createElement("textarea");
-            ta.value = text;
-            document.body.appendChild(ta);
-            ta.select();
-            document.execCommand("copy");
-            document.body.removeChild(ta);
-            done();
-          } catch (_) {
-            alert("Copy failed — select and copy manually:\n" + text);
-          }
-        }
-      });
+        })
+        .catch(() => {
+          alert("Copy failed — select and copy manually:\n" + text);
+        });
     });
   }
 
@@ -452,6 +458,7 @@
   }
 
   function wire() {
+    wireWalletCopyClicks();
     document.querySelectorAll(".tab").forEach((t) => {
       t.addEventListener("click", () => switchTab(t.dataset.tab));
     });
