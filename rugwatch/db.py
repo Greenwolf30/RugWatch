@@ -728,6 +728,8 @@ class RugWatchDB:
         added = 0
         skipped_invalid = 0
         skipped_existing = 0
+        skipped_local = 0
+        skipped_cloud = 0
         skipped_batch_dup = 0
         also = {a.strip() for a in (also_skip or set()) if a and str(a).strip()}
         seen_batch: set[str] = set()
@@ -746,7 +748,13 @@ class RugWatchDB:
             seen_batch.add(addr)
 
             if skip_existing:
-                if addr in also or self.wallet_exists(addr):
+                # Prefer cloud check first so callers can tell "already on GitHub"
+                if addr in also:
+                    skipped_cloud += 1
+                    skipped_existing += 1
+                    continue
+                if self.wallet_exists(addr):
+                    skipped_local += 1
                     skipped_existing += 1
                     continue
 
@@ -774,6 +782,8 @@ class RugWatchDB:
             "imported": added,
             "skipped": skipped,
             "skipped_existing": skipped_existing,
+            "skipped_local": skipped_local,
+            "skipped_cloud": skipped_cloud,
             "skipped_invalid": skipped_invalid,
             "skipped_batch_dup": skipped_batch_dup,
         }

@@ -461,16 +461,15 @@ class RugWatchHandler(BaseHTTPRequestHandler):
                     skip_existing=True,
                     check_cloud=True,
                 )
-                # Optional push after text upload if requested
+                # Always merge-push when requested (local may have wallets cloud lacks)
                 push_flag = body.get("push_cloud")
-                if (
-                    r.get("ok")
-                    and (r.get("imported") or 0) > 0
-                    and (
-                        push_flag is True
-                        or str(push_flag).strip().lower() in {"1", "true", "yes", "on"}
-                    )
-                ):
+                want_push = push_flag is True or str(push_flag).strip().lower() in {
+                    "1",
+                    "true",
+                    "yes",
+                    "on",
+                }
+                if r.get("ok") and want_push:
                     try:
                         from rugwatch.cloud_store import push_to_cloud
 
@@ -480,7 +479,8 @@ class RugWatchHandler(BaseHTTPRequestHandler):
                 elif r.get("ok") and (r.get("imported") or 0) == 0:
                     r["note"] = (
                         r.get("note")
-                        or "No new wallets — all already in local DB and/or cloud."
+                        or "No new local rows (already known). "
+                        "Use Push cloud / Upload with push_cloud to re-sync cloud."
                     )
                 self._json(200 if r.get("ok") else 400, r)
                 return
@@ -491,12 +491,14 @@ class RugWatchHandler(BaseHTTPRequestHandler):
                 self._json(400, {"ok": False, "error": "No wallets found", "imported": 0})
                 return
             src = str(body.get("source") or "web_upload")
-            # Skip addresses already in local DB or cloud — no duplicate wallets
+            # Load live cloud addresses so we only skip true cloud duplicates
             also_skip: set[str] = set()
+            cloud_load_ok = False
             try:
                 from rugwatch.cloud_store import fetch_cloud_address_set
 
                 also_skip = fetch_cloud_address_set()
+                cloud_load_ok = True
             except Exception:  # noqa: BLE001
                 also_skip = set()
             stats = db.import_wallets(
@@ -510,13 +512,23 @@ class RugWatchHandler(BaseHTTPRequestHandler):
                 **stats,
                 "db_wallets": db.stats().get("wallets"),
                 "cloud_known": len(also_skip),
+                "cloud_checked": cloud_load_ok,
             }
+            sk_loc = int(stats.get("skipped_local") or 0)
+            sk_cloud = int(stats.get("skipped_cloud") or 0)
             if (stats.get("imported") or 0) == 0:
                 out["note"] = (
-                    "No new wallets — all already in local DB and/or cloud "
-                    f"(skipped existing: {stats.get('skipped_existing') or 0})."
+                    f"No new local rows. skipped_cloud={sk_cloud} "
+                    f"(already on GitHub list), skipped_local={sk_loc} "
+                    f"(already in this server DB). "
+                    + (
+                        "Merge-push will still run to re-sync cloud from local."
+                        if True
+                        else ""
+                    )
                 )
-            # ATC Ruggers "Upload" sends push_cloud=true to grow the GitHub cloud list
+            # ATC Ruggers Upload sends push_cloud=true — ALWAYS merge-push so
+            # wallets already local but missing from wiped cloud still land on GitHub.
             push_flag = body.get("push_cloud")
             want_push = push_flag is True or str(push_flag).strip().lower() in {
                 "1",
@@ -524,7 +536,7 @@ class RugWatchHandler(BaseHTTPRequestHandler):
                 "yes",
                 "on",
             }
-            if want_push and (stats.get("imported") or 0) > 0:
+            if want_push:
                 try:
                     from rugwatch.cloud_store import push_to_cloud
 
@@ -532,36 +544,20 @@ class RugWatchHandler(BaseHTTPRequestHandler):
                     out["cloud"] = {
                         "ok": bool(pr.get("ok")),
                         "wallet_count": pr.get("wallet_count"),
+                        "cloud_before": pr.get("cloud_before"),
+                        "local_count": pr.get("local_count"),
+                        "added_from_local": pr.get("added_from_local"),
                         "cloud_shards": pr.get("cloud_shards"),
                         "path": pr.get("path"),
                         "index_path": pr.get("index_path"),
                         "error": pr.get("error"),
                         "note": pr.get("note"),
+                        "action": pr.get("action"),
                     }
                     if not pr.get("ok"):
                         out["cloud_error"] = pr.get("error")
                 except Exception as exc:  # noqa: BLE001
                     out["cloud"] = {"ok": False, "error": str(exc)}
-            elif want_push:
-                # Nothing new — still report current cloud size without re-writing
-                try:
-                    from rugwatch.cloud_store import fetch_cloud_wallet_count
-
-                    cc = fetch_cloud_wallet_count()
-                    out["cloud"] = {
-                        "ok": True,
-                        "skipped_push": True,
-                        "wallet_count": cc.get("count"),
-                        "cloud_shards": cc.get("cloud_shards"),
-                        "note": "Push skipped — no new wallets to add.",
-                    }
-                except Exception as exc:  # noqa: BLE001
-                    out["cloud"] = {
-                        "ok": True,
-                        "skipped_push": True,
-                        "error": str(exc),
-                        "note": "Push skipped — no new wallets to add.",
-                    }
             self._json(200, out)
             return
 
