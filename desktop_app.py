@@ -210,10 +210,41 @@ def run_gui() -> None:
 
     log_box = make_text(tab_log)
     wallets_box = make_text(tab_wallets)
-    # Wallets tab: left numbers white; address/notes red
+    # Wallets tab: left numbers yellow; address click-to-copy; notes red
     wallets_box.configure(fg="#ff4d4d", insertbackground="#ff4d4d")
-    wallets_box.tag_configure("w_nums", foreground="#f0f2f5")
+    wallets_box.tag_configure("w_nums", foreground="#f5c542")
     wallets_box.tag_configure("w_data", foreground="#ff4d4d")
+    wallets_box.tag_configure(
+        "w_addr",
+        foreground="#ff6b6b",
+        underline=True,
+    )
+
+    def _on_wallet_addr_click(event: Any) -> str:
+        """Left-click a wallet address in the Wallets tab → copy to clipboard."""
+        try:
+            idx = wallets_box.index(f"@{event.x},{event.y}")
+            ranges = wallets_box.tag_ranges("w_addr")
+            # ranges is (start1, end1, start2, end2, ...)
+            for i in range(0, len(ranges), 2):
+                start, end = ranges[i], ranges[i + 1]
+                if wallets_box.compare(start, "<=", idx) and wallets_box.compare(
+                    idx, "<", end
+                ):
+                    addr = wallets_box.get(start, end).strip()
+                    if addr:
+                        root.clipboard_clear()
+                        root.clipboard_append(addr)
+                        root.update_idletasks()
+                        log(f"Copied address: {addr[:8]}…")
+                    break
+        except Exception:  # noqa: BLE001
+            pass
+        return "break"
+
+    wallets_box.tag_bind("w_addr", "<Button-1>", _on_wallet_addr_click)
+    wallets_box.tag_bind("w_addr", "<Enter>", lambda _e: wallets_box.config(cursor="hand2"))
+    wallets_box.tag_bind("w_addr", "<Leave>", lambda _e: wallets_box.config(cursor=""))
     alerts_box = make_text(tab_alerts)
 
     q: queue.Queue = queue.Queue()
@@ -277,12 +308,15 @@ def run_gui() -> None:
             return
         for w in rows:
             nums = f"{w.get('risk_score'):3}  x{w.get('times_seen')}"
-            data = (
-                f"  {w.get('address')}\n"
-                f"     [{w.get('label') or ''}] {(w.get('notes') or '')[:80]}\n\n"
+            addr = str(w.get("address") or "").strip()
+            rest = (
+                f"\n     [{w.get('label') or ''}] {(w.get('notes') or '')[:80]}\n\n"
             )
             wallets_box.insert("end", nums, "w_nums")
-            wallets_box.insert("end", data, "w_data")
+            wallets_box.insert("end", "  ", "w_data")
+            if addr:
+                wallets_box.insert("end", addr, "w_addr")
+            wallets_box.insert("end", rest, "w_data")
 
     def refresh_alerts() -> None:
         rows = db.list_alerts(limit=50)

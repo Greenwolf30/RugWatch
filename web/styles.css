@@ -239,22 +239,32 @@ body {
   overflow: auto;
   max-height: 60vh;
 }
-/* Wallets tab: left score/times white; address/label/notes red */
+/* Wallets tab: left score/times yellow; address click-to-copy; notes red */
 #panel-wallets .box,
 #walletsBox {
   color: #ff4d4d;
   border-color: rgba(255, 77, 77, 0.35);
 }
 #walletsBox .w-nums {
-  color: #f0f2f5;
-  font-weight: 600;
+  color: #f5c542;
+  font-weight: 700;
 }
 #walletsBox .w-data {
   color: #ff4d4d;
 }
-#panel-wallets .box a,
-#walletsBox a {
+#walletsBox a.w-addr {
   color: #ff6b6b;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+  font-weight: 600;
+}
+#walletsBox a.w-addr:hover {
+  color: #ff9a9a;
+}
+#walletsBox a.w-addr.copied {
+  color: #8ee4a8;
+  text-decoration: none;
 }
 textarea.box { resize: vertical; min-height: 280px; }
 

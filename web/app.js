@@ -130,14 +130,22 @@
           "No wallets yet.\nUse Add wallet, or Upload manual wallets (next to Add wallet).\n";
         return;
       }
-      // Left numbers (score, times) white; address / label / notes red
+      // Left numbers (score, times) yellow; address click-to-copy, label/notes red
       box.innerHTML = rows
         .map((w) => {
           const score = String(w.risk_score != null ? w.risk_score : 0).padStart(3);
           const times = "x" + (w.times_seen || 0);
-          const addr = escHtml(w.address || "");
+          const rawAddr = String(w.address || "").trim();
+          const addr = escHtml(rawAddr);
           const label = escHtml(w.label || "");
           const notes = escHtml(String(w.notes || "").slice(0, 80));
+          const addrHtml = rawAddr
+            ? '<a href="#" class="w-addr" data-copy="' +
+              addr +
+              '" title="Click to copy address">' +
+              addr +
+              "</a>"
+            : "";
           return (
             '<span class="w-nums">' +
             escHtml(score) +
@@ -145,7 +153,7 @@
             escHtml(times) +
             "</span>" +
             '<span class="w-data">  ' +
-            addr +
+            addrHtml +
             "\n     [" +
             label +
             "] " +
@@ -154,9 +162,59 @@
           );
         })
         .join("\n");
+      wireWalletCopyClicks(box);
     } catch (e) {
       box.textContent = "Error: " + e.message;
     }
+  }
+
+  function wireWalletCopyClicks(box) {
+    if (!box) return;
+    box.querySelectorAll("a.w-addr").forEach((a) => {
+      a.addEventListener("click", (ev) => {
+        ev.preventDefault();
+        const text = a.getAttribute("data-copy") || a.textContent || "";
+        if (!text) return;
+        const done = () => {
+          log("Copied address: " + text.slice(0, 8) + "…");
+          const prev = a.textContent;
+          a.classList.add("copied");
+          a.textContent = "copied!";
+          setTimeout(() => {
+            a.textContent = prev;
+            a.classList.remove("copied");
+          }, 900);
+        };
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(text).then(done).catch(() => {
+            // fallback
+            try {
+              const ta = document.createElement("textarea");
+              ta.value = text;
+              document.body.appendChild(ta);
+              ta.select();
+              document.execCommand("copy");
+              document.body.removeChild(ta);
+              done();
+            } catch (_) {
+              alert("Copy failed — select and copy manually:\n" + text);
+            }
+          });
+        } else {
+          try {
+            const ta = document.createElement("textarea");
+            ta.value = text;
+            document.body.appendChild(ta);
+            ta.select();
+            document.execCommand("copy");
+            document.body.removeChild(ta);
+            done();
+          } catch (_) {
+            alert("Copy failed — select and copy manually:\n" + text);
+          }
+        }
+      });
+    });
   }
 
   function formatAlertWeb(a) {
