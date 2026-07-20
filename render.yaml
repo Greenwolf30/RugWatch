@@ -1,0 +1,43 @@
+# RugWatch on Render — Web Service
+# https://dashboard.render.com → New → Blueprint (or create Web Service manually)
+services:
+  - type: web
+    name: rugwatch
+    runtime: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: python run_web.py --host 0.0.0.0
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.12.8"
+      - key: WEB_HOST
+        value: "0.0.0.0"
+      - key: WEB_CORS_ORIGINS
+        value: "*"
+      - key: RUGWATCH_CLOUD
+        value: "repo"
+      - key: RUGWATCH_CLOUD_PRIMARY
+        value: "1"
+      - key: RUGWATCH_GITHUB_REPO
+        value: "Greenwolf30/RugWatch"
+      - key: RUGWATCH_GITHUB_PATH
+        value: "data/wallets_cloud.json"
+      - key: RUGWATCH_GITHUB_BRANCH
+        value: "main"
+      - key: RUGWATCH_CLOUD_INDEX
+        value: "data/wallets_index.json"
+      - key: RUGWATCH_CLOUD_SHARD_MAX
+        value: "100000"
+      - key: RUGWATCH_LOCAL_DB_MAX
+        value: "100000"
+      # Secrets — set in Render Dashboard (do not commit real values)
+      - key: HELIUS_API_KEY
+        sync: false
+      - key: BIRDEYE_API_KEY
+        sync: false
+      - key: SOLSCAN_API_KEY
+        sync: false
+      - key: GITHUB_TOKEN
+        sync: false
+      - key: WEB_API_TOKEN
+        sync: false

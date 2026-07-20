@@ -584,8 +584,10 @@ class RugWatchHandler(BaseHTTPRequestHandler):
 
 def main(argv: list[str] | None = None) -> int:
     load_dotenv()
+    # Render / cloud: PORT is set → bind all interfaces unless WEB_HOST overrides
+    _default_host = "0.0.0.0" if (os.environ.get("PORT") or "").strip() else "127.0.0.1"
     p = argparse.ArgumentParser(description="RugWatch web server")
-    p.add_argument("--host", default=os.environ.get("WEB_HOST", "127.0.0.1"))
+    p.add_argument("--host", default=os.environ.get("WEB_HOST") or _default_host)
     p.add_argument(
         "--port",
         type=int,
