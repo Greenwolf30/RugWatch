@@ -628,7 +628,32 @@ class RugWatchHandler(BaseHTTPRequestHandler):
         if path == "/api/pull-cloud":
             from rugwatch.cloud_store import pull_from_cloud
 
-            result = pull_from_cloud(db)
+            # Optional limit: body.max_wallets | limit | count
+            # "all" / empty / 0 / omit → pull everything
+            max_wallets = None
+            raw_lim = body.get("max_wallets")
+            if raw_lim is None:
+                raw_lim = body.get("limit")
+            if raw_lim is None:
+                raw_lim = body.get("count")
+            if raw_lim is not None and str(raw_lim).strip() != "":
+                s = str(raw_lim).strip().lower()
+                if s not in {"all", "*", "full", "everything"}:
+                    try:
+                        n = int(float(s))
+                        if n > 0:
+                            max_wallets = n
+                    except (TypeError, ValueError):
+                        self._json(
+                            400,
+                            {
+                                "ok": False,
+                                "error": "max_wallets must be a positive number or 'all'",
+                            },
+                        )
+                        return
+
+            result = pull_from_cloud(db, max_wallets=max_wallets)
             err = result.get("error")
             safe = {
                 "ok": bool(result.get("ok")),
@@ -636,6 +661,10 @@ class RugWatchHandler(BaseHTTPRequestHandler):
                 "skipped": result.get("skipped"),
                 "db_wallets": result.get("db_wallets"),
                 "source": result.get("source") or result.get("mode"),
+                "max_wallets": result.get("max_wallets"),
+                "considered": result.get("considered"),
+                "cloud_shards": result.get("cloud_shards"),
+                "local_shards": result.get("local_shards"),
                 "error": redact_text(str(err)) if err else None,
                 "note": result.get("note"),
             }

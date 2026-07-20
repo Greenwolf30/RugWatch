@@ -326,15 +326,41 @@
     }
   }
 
+  function parsePullLimit() {
+    const el = $("pullLimitInput");
+    const raw = el ? String(el.value || "").trim() : "";
+    if (!raw || /^(all|\*|full|everything)$/i.test(raw)) {
+      return { max_wallets: "all" };
+    }
+    const n = parseInt(raw, 10);
+    if (!Number.isFinite(n) || n <= 0) {
+      throw new Error("Pull count must be a positive number or leave blank / type all");
+    }
+    return { max_wallets: n };
+  }
+
   async function doPullCloud() {
-    log("Pull cloud…");
+    let body;
     try {
-      const data = await apiPost("/api/pull-cloud", {});
+      body = parsePullLimit();
+    } catch (e) {
+      alert(e.message || String(e));
+      return;
+    }
+    const lim =
+      body.max_wallets === "all" ? "all" : String(body.max_wallets);
+    log("Pull cloud… (limit=" + lim + ")");
+    try {
+      const data = await apiPost("/api/pull-cloud", body);
       log(
         "Pull cloud OK · imported=" +
           (data.imported ?? 0) +
+          " · skipped=" +
+          (data.skipped ?? 0) +
           " · db_wallets=" +
           (data.db_wallets ?? "?") +
+          (data.considered != null ? " · considered=" + data.considered : "") +
+          (data.max_wallets != null ? " · max=" + data.max_wallets : "") +
           (data.cloud_shards != null ? " · cloud_shards=" + data.cloud_shards : "") +
           (data.local_shards != null ? " · local_shards=" + data.local_shards : "") +
           (data.note ? " · " + data.note : "")

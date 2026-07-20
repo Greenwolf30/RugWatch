@@ -1,0 +1,38 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="RugWatch shield">
+  <!-- Shield logo: dark fill, gold rim (matches RugWatch accent) -->
+  <defs>
+    <linearGradient id="shieldFill" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#1a2430"/>
+      <stop offset="100%" stop-color="#0e141c"/>
+    </linearGradient>
+    <linearGradient id="shieldGold" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#e0c04a"/>
+      <stop offset="50%" stop-color="#c9a227"/>
+      <stop offset="100%" stop-color="#a8841a"/>
+    </linearGradient>
+  </defs>
+  <!-- Outer shield -->
+  <path
+    d="M32 4 L54 12 V30 C54 46 42 56 32 60 C22 56 10 46 10 30 V12 Z"
+    fill="url(#shieldFill)"
+    stroke="url(#shieldGold)"
+    stroke-width="2.5"
+    stroke-linejoin="round"
+  />
+  <!-- Inner highlight -->
+  <path
+    d="M32 10 L48 16 V30 C48 42 39 50 32 54 C25 50 16 42 16 30 V16 Z"
+    fill="none"
+    stroke="rgba(201,162,39,0.35)"
+    stroke-width="1.2"
+  />
+  <!-- Check / watch mark -->
+  <path
+    d="M22 31 L29 38 L44 22"
+    fill="none"
+    stroke="url(#shieldGold)"
+    stroke-width="3.2"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+  />
+</svg>

@@ -353,10 +353,17 @@ def push_to_repo(db: RugWatchDB | None = None) -> dict[str, Any]:
     }
 
 
-def pull_from_repo(db: RugWatchDB | None = None) -> dict[str, Any]:
+def pull_from_repo(
+    db: RugWatchDB | None = None,
+    *,
+    max_wallets: int | None = None,
+) -> dict[str, Any]:
     """
-    Pull all cloud shards (via index when present) into the local multi-DB.
+    Pull cloud shards (via index when present) into the local multi-DB.
     Falls back to a single wallets_cloud.json if no index exists.
+
+    max_wallets: if set, only take the first N wallets from cloud (across shards
+    in index order). None / unlimited = pull all.
     """
     db = db or RugWatchDB()
     index_path = config.cloud_index_path()
@@ -376,14 +383,28 @@ def pull_from_repo(db: RugWatchDB | None = None) -> dict[str, Any]:
     total_skipped = 0
     loaded_paths: list[str] = []
     missing: list[str] = []
+    considered = 0
+    remaining = max_wallets if max_wallets is not None and max_wallets > 0 else None
+    limited = remaining is not None
 
     for path in paths:
+        if remaining is not None and remaining <= 0:
+            break
         parsed = _get_repo_file_json(path)
         if parsed is None:
             missing.append(path)
             continue
         items = parse_wallet_payload(parsed)
+        if remaining is not None:
+            items = items[:remaining]
+        if not items and remaining is not None:
+            loaded_paths.append(path)
+            continue
         stats = db.import_wallets(items, source_default="cloud_repo")
+        n_items = len(items)
+        considered += n_items
+        if remaining is not None:
+            remaining -= n_items
         total_imported += int(stats.get("imported") or 0)
         total_skipped += int(stats.get("skipped") or 0)
         loaded_paths.append(path)
@@ -401,6 +422,12 @@ def pull_from_repo(db: RugWatchDB | None = None) -> dict[str, Any]:
             "cloud_shards": 0,
         }
 
+    note_bits = []
+    if limited:
+        note_bits.append(
+            f"Limited pull: considered {considered} cloud wallet(s)"
+            + (f" (max {max_wallets})" if max_wallets else "")
+        )
     return {
         "ok": True,
         "mode": "repo",
@@ -413,6 +440,9 @@ def pull_from_repo(db: RugWatchDB | None = None) -> dict[str, Any]:
         "db_wallets": db.stats().get("wallets"),
         "cloud_shards": len(loaded_paths),
         "missing": missing or None,
+        "max_wallets": max_wallets if limited else None,
+        "considered": considered if limited else None,
+        "note": "; ".join(note_bits) if note_bits else None,
         "local_shards": db.stats().get("local_shards"),
     }
 
@@ -496,7 +526,11 @@ def push_to_gist(db: RugWatchDB | None = None) -> dict[str, Any]:
     }
 
 
-def pull_from_gist(db: RugWatchDB | None = None) -> dict[str, Any]:
+def pull_from_gist(
+    db: RugWatchDB | None = None,
+    *,
+    max_wallets: int | None = None,
+) -> dict[str, Any]:
     db = db or RugWatchDB()
     gid = gist_id()
     if not gid:
@@ -524,8 +558,11 @@ def pull_from_gist(db: RugWatchDB | None = None) -> dict[str, Any]:
     else:
         return {"ok": False, "error": f"Gist {gid} has no wallet content"}
 
+    limited = max_wallets is not None and max_wallets > 0
+    if limited:
+        items = items[:max_wallets]
     stats = db.import_wallets(items, source_default="cloud_gist")
-    return {
+    out = {
         "ok": True,
         "mode": "gist",
         "source": "gist_api",
@@ -534,6 +571,11 @@ def pull_from_gist(db: RugWatchDB | None = None) -> dict[str, Any]:
         "skipped": stats["skipped"],
         "db_wallets": db.stats().get("wallets"),
     }
+    if limited:
+        out["max_wallets"] = max_wallets
+        out["considered"] = len(items)
+        out["note"] = f"Limited pull: considered {len(items)} cloud wallet(s) (max {max_wallets})"
+    return out
 
 
 # ── Unified API ───────────────────────────────────────────────────────
@@ -557,7 +599,16 @@ def push_to_cloud(db: RugWatchDB | None = None) -> dict[str, Any]:
     return push_to_gist(db)
 
 
-def pull_from_cloud(db: RugWatchDB | None = None) -> dict[str, Any]:
+def pull_from_cloud(
+    db: RugWatchDB | None = None,
+    *,
+    max_wallets: int | None = None,
+) -> dict[str, Any]:
+    """
+    Pull cloud wallets into local DB.
+
+    max_wallets: optional cap (first N wallets from cloud). None = all.
+    """
     mode = cloud_mode()
     if mode == "off":
         return {"ok": False, "error": "RUGWATCH_CLOUD=off"}
@@ -567,10 +618,10 @@ def pull_from_cloud(db: RugWatchDB | None = None) -> dict[str, Any]:
                 "ok": False,
                 "error": "Need GITHUB_TOKEN + RUGWATCH_GITHUB_REPO for repo cloud",
             }
-        return pull_from_repo(db)
+        return pull_from_repo(db, max_wallets=max_wallets)
     if not github_token() and not config.wallets_remote_url():
         return {"ok": False, "error": "Need GITHUB_TOKEN or RUGWATCH_WALLETS_URL"}
-    return pull_from_gist(db)
+    return pull_from_gist(db, max_wallets=max_wallets)
 
 
 def sync_after_manual_change(db: RugWatchDB | None = None) -> dict[str, Any] | None:

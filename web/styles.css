@@ -45,12 +45,49 @@ body {
   margin-right: auto;
 }
 .nav-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
   color: var(--accent);
   font-weight: 700;
   text-decoration: none;
   font-size: 0.95rem;
 }
 .nav-brand:hover { color: #e0c04a; }
+.nav-logo,
+.brand-logo {
+  display: block;
+  flex-shrink: 0;
+  border-radius: 4px;
+}
+.brand-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0;
+  font-size: 1.45rem;
+}
+.pull-limit-lab {
+  display: inline-flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 0.72rem;
+  color: var(--muted);
+  font-weight: 600;
+}
+.pull-limit-input {
+  width: 5.5rem;
+  background: var(--entry);
+  border: 1px solid var(--border);
+  color: var(--fg);
+  border-radius: 7px;
+  padding: 7px 8px;
+  font-size: 0.84rem;
+}
+.pull-limit-input:focus {
+  outline: none;
+  border-color: rgba(201, 162, 39, 0.55);
+}
 .nav-links { display: flex; gap: 4px; align-items: center; }
 .nav-link {
   color: var(--muted);

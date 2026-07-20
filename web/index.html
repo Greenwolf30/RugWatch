@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <meta name="referrer" content="no-referrer" />
   <title>RugWatch — serial wallet DB</title>
+  <link rel="icon" href="/logo.svg" type="image/svg+xml" />
   <link rel="stylesheet" href="/styles.css" />
 </head>
 <body>
@@ -12,7 +13,10 @@
     <nav class="site-nav" aria-label="Main">
       <div class="site-nav-inner">
         <div class="nav-left">
-          <a class="nav-brand" href="/" title="Home">RugWatch</a>
+          <a class="nav-brand" href="/" title="Home">
+            <img class="nav-logo" src="/logo.svg" width="28" height="28" alt="" />
+            <span>RugWatch</span>
+          </a>
         </div>
         <div class="nav-links">
           <a
@@ -37,7 +41,10 @@
 
     <header class="top">
       <div class="brand">
-        <h1>RugWatch</h1>
+        <h1 class="brand-title">
+          <img class="brand-logo" src="/logo.svg" width="36" height="36" alt="" />
+          <span>RugWatch</span>
+        </h1>
         <p class="tag">Serial rugger wallet DB · website (keys stay on the server)</p>
       </div>
       <div class="pills" id="pillsBar" title="wallets = local now · logged = lifetime · cloud = GitHub now">
@@ -62,6 +69,17 @@
       <button type="button" id="btnMonitor" class="btn">Monitor once</button>
       <button type="button" id="btnRefresh" class="btn">Refresh</button>
       <button type="button" id="btnPushCloud" class="btn">Push cloud</button>
+      <label class="pull-limit-lab" title="How many cloud wallets to pull this time. Leave blank or type all for every shard.">
+        Pull count
+        <input
+          type="text"
+          id="pullLimitInput"
+          class="mono pull-limit-input"
+          placeholder="all"
+          inputmode="numeric"
+          autocomplete="off"
+        />
+      </label>
       <button type="button" id="btnPullCloud" class="btn">Pull cloud</button>
       <button type="button" id="btnClearDb" class="btn danger">Clear DB</button>
     </section>
