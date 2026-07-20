@@ -210,13 +210,13 @@ def run_gui() -> None:
 
     log_box = make_text(tab_log)
     wallets_box = make_text(tab_wallets)
-    # Wallets tab: left numbers yellow; address click-to-copy; notes red
-    wallets_box.configure(fg="#ff4d4d", insertbackground="#ff4d4d")
-    wallets_box.tag_configure("w_nums", foreground="#f5c542")
-    wallets_box.tag_configure("w_data", foreground="#ff4d4d")
+    # Wallets tab: dimmer yellow scores; dimmer red address/notes
+    wallets_box.configure(fg="#c47a7a", insertbackground="#c47a7a")
+    wallets_box.tag_configure("w_nums", foreground="#c4a84a")
+    wallets_box.tag_configure("w_data", foreground="#c47a7a")
     wallets_box.tag_configure(
         "w_addr",
-        foreground="#ff6b6b",
+        foreground="#c98a8a",
         underline=True,
     )
 
