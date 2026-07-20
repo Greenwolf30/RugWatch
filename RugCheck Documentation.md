@@ -758,11 +758,42 @@ Pills = **sum across all shards**.
 | ~100k – few hundred k | Multi-shard; slower Push / ATC |
 | ~1M+ | Possible; expect heavy loads |
 
+### PC pull from cloud (won’t “crash” at one magic number)
+
+| Machine | Comfortable pull | Stretching it | Risky |
+|---------|------------------|---------------|--------|
+| Laptop ~8 GB RAM | 100k–300k | ~500k–1M | Several million at once |
+| Desktop 16–32 GB | 1M+ | A few million | Tens of millions |
+| Free Render web | Tens of k – low hundreds of k | OOM risk | Large multi-shard pull |
+
+Peak RAM during pull is often **a few × JSON size**. **UI listing** every wallet freezes before disk does.
+
+### Free hosting (e.g. Render free)
+
+| Behavior | Effect |
+|----------|--------|
+| Sleep after idle | ~30–90s cold start |
+| Ephemeral disk | Local DB wiped — use **Push/Pull cloud** |
+| Outbound APIs | Still work (Helius, Birdeye, GitHub, DexScreener, …) |
+| Concurrent Analyzes | Light personal use OK; many users at once → timeouts / 429s |
+
+External free tiers (Helius monthly caps, Birdeye rate limits, GitHub ~5k req/h with PAT) often bind before the host does.
+
+### Recommended ranges (summary)
+
+| Total wallets | Desktop PC | Free Render | ATC flags |
+|---------------|------------|-------------|-----------|
+| &lt; 10k | Excellent | Excellent | Excellent |
+| 10k–100k | Excellent | OK | OK |
+| 100k–500k | Good | Heavy | Slower |
+| 1M+ | Careful | Not recommended free | Risky free |
+
 **UI note:** Wallets tab still shows ~100 rows; the rest stay in the DB.  
 **ATC:** use index URL `.../data/wallets_index.json` so Analyze can load every cloud shard.  
 Quality of flags still beats dumping everything.
 
-Full scheme: **EXTERNAL_STORAGE.md** → *Wallet capacity scheme (current)*.
+**Full charts (cloud size, APIs, free hosting, bottom-line Q&A):**  
+**EXTERNAL_STORAGE.md** → *Capacity limits (full guide)*.
 
 ---
 

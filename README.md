@@ -26,7 +26,8 @@ python run_web.py --port 8790
 
 Open http://127.0.0.1:8790/ — on-site docs: `/docs.html`.
 
-**Capacity:** about 100,000 wallets per local database file and per cloud file, then a new file is created automatically. See **EXTERNAL_STORAGE.md**.
+**Capacity:** about **100,000** wallets per local DB file and per cloud file, then a new file is created automatically (no fixed total cap).  
+Full limits charts (PC pull, free hosting, API quotas): **EXTERNAL_STORAGE.md** → *Capacity limits (full guide)*.
 
 **Actual Token Checker:** Ruggers **Upload** can send sellers here; Analyze flags read local and/or cloud lists. Full guide: **RugCheck Documentation.md**.
 
