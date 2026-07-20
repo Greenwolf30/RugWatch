@@ -240,74 +240,21 @@ body {
   max-height: 60vh;
 }
 
-/* Wallets tab (Log | Wallets | Alerts): yellow scores · red wallet · red mint (mint click-to-copy) */
+/* Wallets tab: yellow scores, red wallet address + notes */
 #panel-wallets .box,
 #walletsBox {
-  white-space: normal;
+  white-space: pre-wrap;
   color: #c47a7a;
 }
-#walletsBox .w-row {
-  display: grid;
-  grid-template-columns: 4.5rem minmax(0, 1fr) minmax(0, 1fr);
-  gap: 8px 12px;
-  padding: 10px 4px;
-  border-bottom: 1px solid rgba(80, 90, 100, 0.35);
-  align-items: start;
+#walletsBox .w-line {
+  margin: 0 0 0.35em;
 }
 #walletsBox .w-nums {
   color: #c4a84a;
   font-weight: 600;
-  white-space: pre;
-  pointer-events: none;
 }
-#walletsBox .w-wallet {
+#walletsBox .w-data {
   color: #c47a7a;
-  word-break: break-all;
-  font-weight: 500;
-}
-#walletsBox .w-mint-wrap {
-  text-align: right;
-  word-break: break-all;
-}
-#walletsBox button.w-mint {
-  background: none;
-  border: none;
-  padding: 0;
-  margin: 0;
-  font: inherit;
-  font-family: var(--mono);
-  color: #c47a7a;
-  text-decoration: underline;
-  text-underline-offset: 2px;
-  cursor: pointer;
-  text-align: right;
-  word-break: break-all;
-  max-width: 100%;
-}
-#walletsBox button.w-mint:hover {
-  color: #d49090;
-}
-#walletsBox button.w-mint.copied {
-  color: #6aab80;
-  text-decoration: none;
-}
-#walletsBox .w-mint-empty {
-  color: #6a7080;
-}
-#walletsBox .w-meta {
-  grid-column: 2 / -1;
-  color: #a86a6a;
-  font-size: 0.88em;
-  pointer-events: none;
-}
-@media (max-width: 700px) {
-  #walletsBox .w-row {
-    grid-template-columns: 4rem 1fr;
-  }
-  #walletsBox .w-mint-wrap {
-    grid-column: 2;
-    text-align: left;
-  }
 }
 
 textarea.box { resize: vertical; min-height: 280px; }

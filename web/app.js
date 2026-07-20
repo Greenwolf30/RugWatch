@@ -120,52 +120,6 @@
       .replace(/"/g, "&quot;");
   }
 
-  function forceCopyText(text) {
-    const t = String(text || "").trim();
-    if (!t) return false;
-    const ta = document.createElement("textarea");
-    ta.value = t;
-    ta.setAttribute("readonly", "");
-    ta.style.cssText =
-      "position:fixed;top:0;left:0;width:1px;height:1px;padding:0;border:none;opacity:0;";
-    document.body.appendChild(ta);
-    ta.focus();
-    ta.select();
-    try {
-      ta.setSelectionRange(0, t.length);
-    } catch (_) {}
-    let ok = false;
-    try {
-      ok = document.execCommand("copy");
-    } catch (_) {
-      ok = false;
-    }
-    document.body.removeChild(ta);
-    return ok;
-  }
-
-  function copyText(text, onOk) {
-    const t = String(text || "").trim();
-    if (!t) return;
-    const done = () => {
-      if (typeof onOk === "function") onOk();
-      log("Copied: " + t.slice(0, 12) + "…");
-    };
-    if (navigator.clipboard && navigator.clipboard.writeText) {
-      navigator.clipboard
-        .writeText(t)
-        .then(done)
-        .catch(() => {
-          if (forceCopyText(t)) done();
-          else window.prompt("Copy with Ctrl+C:", t);
-        });
-    } else if (forceCopyText(t)) {
-      done();
-    } else {
-      window.prompt("Copy with Ctrl+C:", t);
-    }
-  }
-
   async function refreshWallets() {
     const box = $("walletsBox");
     if (!box) return;
@@ -177,71 +131,34 @@
           "No wallets yet.\nUse Add wallet, or Upload manual wallets (next to Add wallet).\n";
         return;
       }
-      // scores (yellow) · wallet (red) · mint (red, click to copy)
+      // Simple list: yellow scores · red wallet/notes (no copy handlers)
       box.innerHTML = rows
         .map((w) => {
           const score = String(w.risk_score != null ? w.risk_score : 0).padStart(3);
           const times = "x" + (w.times_seen || 0);
-          const wallet = String(w.address || "").trim();
-          const mint = String(w.mint || "").trim();
+          const addr = escHtml(w.address || "");
           const label = escHtml(w.label || "");
-          const notes = escHtml(String(w.notes || "").slice(0, 60));
-          const mintBtn = mint
-            ? '<button type="button" class="w-mint" data-copy="' +
-              escHtml(mint) +
-              '" title="Left-click to copy mint">' +
-              escHtml(mint) +
-              "</button>"
-            : '<span class="w-mint-empty">—</span>';
+          const notes = escHtml(String(w.notes || "").slice(0, 80));
           return (
-            '<div class="w-row">' +
+            '<div class="w-line">' +
             '<span class="w-nums">' +
             escHtml(score) +
             "  " +
             escHtml(times) +
             "</span>" +
-            '<span class="w-wallet">' +
-            escHtml(wallet) +
-            "</span>" +
-            '<span class="w-mint-wrap">' +
-            mintBtn +
-            "</span>" +
-            '<div class="w-meta">[' +
+            '<span class="w-data">  ' +
+            addr +
+            "\n     [" +
             label +
             "] " +
             notes +
-            "</div></div>"
+            "\n</span></div>"
           );
         })
-        .join("");
+        .join("\n");
     } catch (e) {
       box.textContent = "Error: " + e.message;
     }
-  }
-
-  function wireWalletMintCopy() {
-    const box = $("walletsBox");
-    if (!box || box.dataset.copyWired === "1") return;
-    box.dataset.copyWired = "1";
-    box.addEventListener("click", (ev) => {
-      const btn =
-        ev.target && ev.target.closest
-          ? ev.target.closest("button.w-mint")
-          : null;
-      if (!btn || !box.contains(btn)) return;
-      ev.preventDefault();
-      const text = (btn.getAttribute("data-copy") || btn.textContent || "").trim();
-      if (!text) return;
-      copyText(text, () => {
-        const prev = btn.textContent;
-        btn.classList.add("copied");
-        btn.textContent = "copied!";
-        setTimeout(() => {
-          btn.textContent = prev;
-          btn.classList.remove("copied");
-        }, 900);
-      });
-    });
   }
 
   function formatAlertWeb(a) {
@@ -503,7 +420,6 @@
       });
     }
     $("btnAdd").addEventListener("click", () => doAdd());
-    wireWalletMintCopy();
     // Upload manual wallets is next to Add wallet (no Upload tab)
     if ($("fileInput")) {
       $("fileInput").addEventListener("change", async (ev) => {
