@@ -1,0 +1,14 @@
+{
+  "format": "rugwatch_wallets_index_v1",
+  "shard_max_wallets": 100000,
+  "shards": [
+    {
+      "path": "data/wallets_cloud.json",
+      "count": 37,
+      "shard": 1
+    }
+  ],
+  "total_count": 37,
+  "updated_at": "2026-07-20T11:30:41.810527+00:00",
+  "note": "Multi-shard wallet index. ATC/readers should load every path in shards[]. Each file is rugwatch_wallets_v1."
+}
