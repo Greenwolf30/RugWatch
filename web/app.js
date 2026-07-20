@@ -130,7 +130,7 @@
           "No wallets yet.\nUse Add wallet, or Upload manual wallets (next to Add wallet).\n";
         return;
       }
-      // Left numbers (score, times) yellow; address click-to-copy, label/notes red
+      // Left = scores only (not clickable). Right = address (click to copy) + notes.
       box.innerHTML = rows
         .map((w) => {
           const score = String(w.risk_score != null ? w.risk_score : 0).padStart(3);
@@ -142,26 +142,27 @@
           const addrHtml = rawAddr
             ? '<a href="#" class="w-addr" data-copy="' +
               addr +
-              '" title="Click to copy address">' +
+              '" title="Click to copy wallet address">' +
               addr +
               "</a>"
-            : "";
+            : '<span class="w-missing">(no address)</span>';
           return (
-            '<span class="w-nums">' +
+            '<div class="w-row">' +
+            '<div class="w-left w-nums" aria-hidden="false">' +
             escHtml(score) +
             "  " +
             escHtml(times) +
-            "</span>" +
-            '<span class="w-data">  ' +
+            "</div>" +
+            '<div class="w-right">' +
             addrHtml +
-            "\n     [" +
+            '<div class="w-meta">[' +
             label +
             "] " +
             notes +
-            "\n</span>"
+            "</div></div></div>"
           );
         })
-        .join("\n");
+        .join("");
       wireWalletCopyClicks(box);
     } catch (e) {
       box.textContent = "Error: " + e.message;

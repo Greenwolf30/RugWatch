@@ -307,16 +307,17 @@ def run_gui() -> None:
             )
             return
         for w in rows:
+            # Left column (not clickable): score + times
             nums = f"{w.get('risk_score'):3}  x{w.get('times_seen')}"
             addr = str(w.get("address") or "").strip()
-            rest = (
-                f"\n     [{w.get('label') or ''}] {(w.get('notes') or '')[:80]}\n\n"
-            )
-            wallets_box.insert("end", nums, "w_nums")
-            wallets_box.insert("end", "  ", "w_data")
+            # Right column: address (clickable) + meta
+            meta = f"\n     [{w.get('label') or ''}] {(w.get('notes') or '')[:80]}\n\n"
+            wallets_box.insert("end", nums + "  ", "w_nums")
             if addr:
                 wallets_box.insert("end", addr, "w_addr")
-            wallets_box.insert("end", rest, "w_data")
+            else:
+                wallets_box.insert("end", "(no address)", "w_data")
+            wallets_box.insert("end", meta, "w_data")
 
     def refresh_alerts() -> None:
         rows = db.list_alerts(limit=50)

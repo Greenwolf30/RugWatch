@@ -239,18 +239,39 @@ body {
   overflow: auto;
   max-height: 60vh;
 }
-/* Wallets tab: dimmer yellow scores / dimmer red address+notes */
+/* Wallets tab: left scores (not clickable); right address click-to-copy */
 #panel-wallets .box,
 #walletsBox {
   color: #c47a7a;
   border-color: rgba(160, 90, 90, 0.28);
+  white-space: normal;
 }
-#walletsBox .w-nums {
+#walletsBox .w-row {
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+  padding: 8px 0;
+  border-bottom: 1px solid rgba(80, 90, 100, 0.35);
+  user-select: text;
+}
+#walletsBox .w-left {
+  flex: 0 0 4.5rem;
   color: #c4a84a;
   font-weight: 600;
+  white-space: pre;
+  pointer-events: none; /* never clickable */
+  cursor: default;
 }
-#walletsBox .w-data {
+#walletsBox .w-right {
+  flex: 1;
+  min-width: 0;
+  word-break: break-all;
+}
+#walletsBox .w-meta {
+  margin-top: 4px;
   color: #c47a7a;
+  font-size: 0.9em;
+  pointer-events: none;
 }
 #walletsBox a.w-addr {
   color: #c98a8a;
@@ -258,6 +279,7 @@ body {
   text-underline-offset: 2px;
   cursor: pointer;
   font-weight: 500;
+  pointer-events: auto;
 }
 #walletsBox a.w-addr:hover {
   color: #d9a0a0;
