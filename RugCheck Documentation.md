@@ -352,7 +352,7 @@ Cloud must be set up for your account first. Failures appear in a dialog and the
 
 Use for: backup, second PC, or keeping one shared list you control.
 
-**Capacity / auto-shard:** default **100,000 wallets per cloud file** and **per local DB**. When full, RugWatch creates the next file automatically (`wallets_cloud_002.json`, `rugwatch_002.db`, …). Push/Pull uses **all** shards via `data/wallets_index.json`. See [How many wallets is “too many”?](#how-many-wallets-is-too-many) and **EXTERNAL_STORAGE.md**.
+**Capacity / auto-shard:** **100,000 wallets per cloud file** and **per local DB** (`RUGWATCH_CLOUD_SHARD_MAX` / `RUGWATCH_LOCAL_DB_MAX`). When full, next file is created automatically. Push/Pull uses **all** shards via `data/wallets_index.json`. See [How many wallets? (capacity scheme)](#how-many-wallets-capacity-scheme) and **EXTERNAL_STORAGE.md**.
 
 ---
 
@@ -700,78 +700,44 @@ Desktop: `python desktop_app.py` or `dist\RugWatch\RugWatch.exe`.
 
 ---
 
-## How many wallets is “too many”?
+## How many wallets? (capacity scheme)
 
-For **disk alone**, a normal PC almost never fails from wallet count. Each row is a small SQLite record.
+RugWatch **auto-shards** local DBs and cloud JSON. There is **no fixed total cap**.
 
-| Scale | Rough feel |
-|-------|------------|
-| **Hundreds** | Ideal for a personal serial list |
-| **Thousands** | Fine |
-| **~10k–50k** | Usually OK; Monitor / export / cloud push can feel slower |
-| **100k+** | Possible; app becomes heavy (lists, export, Monitor load) |
-| **Millions** | Not what this app is designed for |
+### Per-file defaults (matches app code)
 
-**What gets heavy first (not disk):**
+| Store | Env | Max wallets / file | When full |
+|--------|-----|--------------------|-----------|
+| **Local DB** | `RUGWATCH_LOCAL_DB_MAX=100000` | **100,000** | Creates `rugwatch_002.db`, then `_003`, … |
+| **Cloud JSON** | `RUGWATCH_CLOUD_SHARD_MAX=100000` | **100,000** | Creates `wallets_cloud_002.json`, … + updates `wallets_index.json` |
 
-1. **Monitor once** — loads known wallets (score ≥ 40) into memory (up to ~50k in code) and checks ~25 launches.  
-2. **Wallets tab** — only shows **100** on screen; the rest stay in the DB.  
-3. **Export / Push cloud** — large JSON files take longer.  
-4. **Actual Token Checker** — merges local + cloud on Analyze; huge lists = more matching work.
+### Totals (examples)
 
-**Practical advice:** Prefer a **curated** list (hundreds to a few thousand) over dumping everything. Quality of flags matters more than raw count. **Clear DB** frees **local** list space when you want a clean slate (export/push first if you still need the data).
+| Shard files | Approx. total |
+|-------------|----------------|
+| 1 | 100,000 |
+| 2 | 200,000 |
+| 5 | 500,000 |
+| 10 | 1,000,000 |
 
-### Cloud capacity + auto-sharding
+**Push cloud** packs all local wallets into shards + index.  
+**Pull cloud** merges every cloud shard.  
+Pills = **sum across all shards**.
 
-RugWatch does **not** hard-cap the **total** wallets you can store. When one file fills up, it **opens another**:
+### Effective speed guidance
 
-| | Default max per file | Next file name |
-|--|----------------------|----------------|
-| Cloud | `RUGWATCH_CLOUD_SHARD_MAX=100000` | `wallets_cloud_002.json`, `_003`, … + `wallets_index.json` |
-| Local | `RUGWATCH_LOCAL_DB_MAX=100000` | `rugwatch_002.db`, `_003`, … |
+| Total wallets | Feel |
+|---------------|------|
+| Hundreds – few thousand | Ideal curated list |
+| ~10k – 100k | Strong (single shard) |
+| ~100k – few hundred k | Multi-shard; slower Push / ATC |
+| ~1M+ | Possible; expect heavy loads |
 
-**Push cloud** packs every local wallet into shards and updates the index.  
-**Pull cloud** merges **every** cloud shard into local DBs.  
-Pills show **combined totals** across all shards.
+**UI note:** Wallets tab still shows ~100 rows; the rest stay in the DB.  
+**ATC:** use index URL `.../data/wallets_index.json` so Analyze can load every cloud shard.  
+Quality of flags still beats dumping everything.
 
-Per-file practical size (GitHub / ATC speed) still applies to each shard:
-
-#### Hard limits (GitHub)
-
-| Limit | Meaning |
-|--------|---------|
-| **~100 MB** | Hard max for a normal file in a GitHub repo |
-| **~1 MB** | Best zone for the Contents API used by Push/Pull cloud |
-| **No fixed wallet count** | Code does not stop at 1,000 / 10,000 / etc. |
-
-#### Rough size (with labels/notes like Ruggers exports)
-
-About **350–400 bytes per wallet** when notes are included.
-
-| File size | Approx. wallets |
-|-----------|------------------|
-| **1 MB** | ~2,500–3,000 |
-| **5 MB** | ~12,000–15,000 |
-| **10 MB** | ~25,000–30,000 |
-| **50 MB** | ~100,000+ (gets heavy) |
-| **100 MB** | theoretical max — not recommended |
-
-Address-only rows (short notes) fit **several times more**.
-
-#### Practical recommendation for cloud + ATC
-
-| Range | Guidance |
-|--------|----------|
-| **Thousands → ~10k–30k** | Comfortable: fast Push/Pull, fine for website + ATC on Render |
-| **~50k–100k+** | Still works, but slower loads and larger downloads |
-| **Huge multi‑MB list every push** | Risk of timeouts, slow ATC scans, API friction |
-
-**Effective target for RugWatch + ATC flags:** about **10,000–30,000 wallets** in the cloud file.  
-Hundreds of thousands are possible on GitHub but not ideal for speed.
-
-Local SQLite can hold more than you push; only what you **Push cloud** is what ATC reads via `RUGWATCH_WALLETS_URL`.
-
-More detail: **EXTERNAL_STORAGE.md** → *Cloud capacity (how many wallets)*.
+Full scheme: **EXTERNAL_STORAGE.md** → *Wallet capacity scheme (current)*.
 
 ---
 

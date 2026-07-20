@@ -50,55 +50,51 @@ Working store is local multi-DB (`rugwatch.db` + overflow).
 
 ---
 
-## Auto-sharding (new DBs / cloud files when full)
+## Wallet capacity scheme (current)
 
-| Store | Cap per file (default) | What happens when full |
-|--------|-------------------------|-------------------------|
-| **Cloud JSON** | `RUGWATCH_CLOUD_SHARD_MAX` = **100000** | Creates `wallets_cloud_002.json`, then `_003`, … and updates `wallets_index.json` |
-| **Local SQLite** | `RUGWATCH_LOCAL_DB_MAX` = **100000** | Creates `rugwatch_002.db`, then `_003`, … New wallets go into the newest file under the cap |
+RugWatch **auto-shards**. There is **no fixed total wallet cap**.  
+When one file fills, the next file is created automatically.
 
-- Website **Push cloud** writes **all** needed shards + index.  
-- Website **Pull cloud** reads **all** shards in the index.  
-- Counts (`wallets` pill / `cloud` pill) are **totals across all shards**.  
-- For ATC multi-shard, point `RUGWATCH_WALLETS_URL` at the **index** raw URL when the bridge supports it:  
-  `https://raw.githubusercontent.com/YourUser/RugWatch/main/data/wallets_index.json`
+### Per-file limits (defaults)
 
-## Cloud capacity (how many wallets)
+| Store | Env var | Wallets per file | Next file when full |
+|--------|---------|------------------|---------------------|
+| **Local SQLite** | `RUGWATCH_LOCAL_DB_MAX` | **100,000** | `rugwatch_002.db`, `rugwatch_003.db`, … |
+| **Cloud JSON** | `RUGWATCH_CLOUD_SHARD_MAX` | **100,000** | `wallets_cloud_002.json`, `_003`, … |
 
-RugWatch does **not** hard-cap the **total** number of wallets.  
-Each **shard file** still has practical size limits; auto-sharding opens the next file at the configured max.
+Primary files stay: `data/rugwatch.db` and `data/wallets_cloud.json`.  
+Cloud also keeps **`data/wallets_index.json`** listing every shard and `total_count`.
 
-### Hard limits (GitHub)
+### How totals grow
 
-| Limit | Meaning |
-|--------|---------|
-| **~100 MB** | Hard max for a normal file in a GitHub repo |
-| **~1 MB** | Best zone for the Contents API used by Push/Pull cloud |
-| **No fixed wallet count** | Code does not stop at 1,000 / 10,000 / etc. |
+| Shards | Approx. total capacity (at 100k each) |
+|--------|----------------------------------------|
+| 1 | 100,000 |
+| 2 | 200,000 |
+| 5 | 500,000 |
+| 10 | 1,000,000 |
 
-### Rough size (with labels/notes like Ruggers exports)
+Website **Push cloud** writes **all** shards + index.  
+Website **Pull cloud** merges **every** listed cloud shard into local DBs.  
+Pills show **combined totals** across all local / cloud shards.
 
-About **350–400 bytes per wallet** when notes are included.
+### Effective use (speed, not hard caps)
 
-| File size | Approx. wallets |
-|-----------|------------------|
-| **1 MB** | ~2,500–3,000 |
-| **5 MB** | ~12,000–15,000 |
-| **10 MB** | ~25,000–30,000 |
-| **50 MB** | ~100,000+ (gets heavy) |
-| **100 MB** | theoretical max — not recommended |
+| Total wallets | Guidance |
+|---------------|----------|
+| **Hundreds – few thousand** | Ideal day-to-day |
+| **~10,000 – 100,000** | Strong; one local DB + one cloud file |
+| **~100,000 – few hundred thousand** | Multi-shard; Push/ATC slower but OK |
+| **~1M+** | Possible; expect heavy Push and ATC loads |
 
-Address-only rows (short notes) fit **several times more**.
+ATC (Render) should use the **index** URL so it always loads every cloud shard:
 
-### Practical recommendation
+```text
+RUGWATCH_WALLETS_URL=https://raw.githubusercontent.com/YourUser/RugWatch/main/data/wallets_index.json
+```
 
-| Range | Guidance |
-|--------|----------|
-| **Thousands → ~10k–30k** | Comfortable: fast Push/Pull, fine for website + ATC on Render |
-| **~50k–100k+** | Still works, but slower loads and larger downloads |
-| **Huge multi‑MB list every push** | Risk of timeouts, slow ATC scans, API friction |
+### GitHub file-size note
 
-**Effective target for RugWatch + ATC flags:** about **10,000–30,000 wallets**.  
-Hundreds of thousands are possible on GitHub but not ideal for speed.
-
-Local SQLite (`data/rugwatch.db`) can hold more than you push; only what you **Push cloud** is what ATC reads via `RUGWATCH_WALLETS_URL`.
+Each cloud JSON is still a normal GitHub file (hard max ~100 MB).  
+With short notes, **100,000 wallets per shard** fits the design.  
+Very long notes may force earlier/smaller practical shards — lower `RUGWATCH_CLOUD_SHARD_MAX` if pushes time out.
