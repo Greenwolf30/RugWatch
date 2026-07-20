@@ -421,59 +421,123 @@
     }
     $("btnAdd").addEventListener("click", () => doAdd());
 
+    /** Reliable clipboard write (Windows browsers). */
+    function forceCopyText(text) {
+      const t = String(text || "");
+      if (!t) return false;
+      // 1) modern API
+      try {
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          // sync path: fire async; return "pending" via separate handlers below
+        }
+      } catch (_) {}
+      // 2) classic textarea + execCommand (works on most local HTTP pages)
+      const ta = document.createElement("textarea");
+      ta.value = t;
+      ta.setAttribute("readonly", "");
+      ta.style.cssText =
+        "position:fixed;top:0;left:0;width:1px;height:1px;padding:0;border:none;outline:none;opacity:0;";
+      document.body.appendChild(ta);
+      ta.focus();
+      ta.select();
+      try {
+        ta.setSelectionRange(0, t.length);
+      } catch (_) {}
+      let ok = false;
+      try {
+        ok = document.execCommand("copy");
+      } catch (_) {
+        ok = false;
+      }
+      document.body.removeChild(ta);
+      return ok;
+    }
+
+    function showMintCopyStatus(msg, ok) {
+      const st = $("mintCopyStatus");
+      if (st) {
+        st.hidden = false;
+        st.textContent = msg;
+        st.style.color = ok ? "#8ee4a8" : "#f07178";
+      }
+      try {
+        log(msg);
+      } catch (_) {}
+    }
+
     function copyMintField() {
       const mintEl = $("mintInput");
-      if (!mintEl) return;
-      const v = String(mintEl.value || "").trim();
-      if (!v) {
-        alert("Mint field is empty.\n\nPaste a mint address first, then click Copy mint (or click the field).");
+      if (!mintEl) {
+        alert("Mint field not found on page.");
         return;
       }
-      mintEl.focus();
-      mintEl.select();
-      const done = () => {
-        log("Copied mint: " + v.slice(0, 12) + "…");
+      const v = String(mintEl.value || "").trim();
+      if (!v) {
+        showMintCopyStatus("Mint field is empty — paste an address first.", false);
+        alert("Mint field is empty.\n\nPaste a mint address, then click Copy mint.");
+        return;
+      }
+
+      // Prefer async clipboard, fall back to execCommand, then prompt
+      const succeed = () => {
+        showMintCopyStatus("Copied: " + v.slice(0, 16) + "…", true);
         const btn = $("btnCopyMint");
         if (btn) {
           const prev = btn.textContent;
           btn.textContent = "Copied!";
           setTimeout(() => {
             btn.textContent = prev || "Copy mint";
-          }, 1000);
+          }, 1200);
         }
       };
-      const fail = () => {
-        // last resort: show address so user can copy
-        window.prompt("Copy this mint address (Ctrl+C):", v);
+      const failPrompt = () => {
+        showMintCopyStatus("Auto-copy failed — use Ctrl+C in the box below.", false);
+        window.prompt("Select the text and press Ctrl+C to copy:", v);
       };
-      const tryExec = () => {
-        try {
-          const ok = document.execCommand("copy");
-          if (ok) done();
-          else fail();
-        } catch (_) {
-          fail();
+
+      let usedAsync = false;
+      try {
+        if (navigator.clipboard && typeof navigator.clipboard.writeText === "function") {
+          usedAsync = true;
+          navigator.clipboard.writeText(v).then(succeed).catch(() => {
+            if (forceCopyText(v)) succeed();
+            else failPrompt();
+          });
         }
-      };
-      if (navigator.clipboard && window.isSecureContext !== false) {
-        navigator.clipboard.writeText(v).then(done).catch(tryExec);
-      } else {
-        tryExec();
+      } catch (_) {
+        usedAsync = false;
+      }
+      if (!usedAsync) {
+        if (forceCopyText(v)) succeed();
+        else failPrompt();
       }
     }
 
-    // Left-click mint field → copy (when it has a value)
+    // Left-click mint field → copy when it already has a value
     if ($("mintInput")) {
-      $("mintInput").addEventListener("click", (ev) => {
+      $("mintInput").addEventListener("dblclick", (ev) => {
+        ev.preventDefault();
+        copyMintField();
+      });
+      // Also copy on single click if field already has content (after a short delay)
+      $("mintInput").addEventListener("mouseup", (ev) => {
+        if (ev.button !== 0) return;
         const v = String($("mintInput").value || "").trim();
-        if (!v) return; // empty: allow normal focus to type
-        // Delay so click finishes selecting in the field
-        setTimeout(copyMintField, 0);
+        if (!v) return;
+        // Only auto-copy if user is not selecting a range to edit
+        const el = $("mintInput");
+        const selLen =
+          typeof el.selectionEnd === "number" && typeof el.selectionStart === "number"
+            ? el.selectionEnd - el.selectionStart
+            : 0;
+        if (selLen > 0 && selLen < v.length) return;
+        copyMintField();
       });
     }
     if ($("btnCopyMint")) {
       $("btnCopyMint").addEventListener("click", (ev) => {
         ev.preventDefault();
+        ev.stopPropagation();
         copyMintField();
       });
     }

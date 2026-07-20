@@ -568,25 +568,30 @@ def run_gui() -> None:
     def copy_mint_field() -> None:
         v = mint_var.get().strip()
         if not v:
-            messagebox.showinfo(__app_name__, "Mint field is empty.\nPaste a mint first, then copy.")
+            messagebox.showinfo(
+                __app_name__,
+                "Mint field is empty.\n\nPaste a mint address first, then click Copy mint.",
+            )
             return
         try:
             root.clipboard_clear()
             root.clipboard_append(v)
-            root.update()
-            log(f"Copied mint: {v[:12]}…")
+            # Keep on clipboard after app loses focus (Windows)
+            try:
+                root.clipboard_get()
+            except tk.TclError:
+                root.clipboard_append(v)
+            root.update_idletasks()
+            log(f"Copied mint: {v[:16]}…")
+            messagebox.showinfo(__app_name__, f"Copied to clipboard:\n\n{v}")
         except Exception as exc:  # noqa: BLE001
-            messagebox.showerror(__app_name__, f"Copy failed:\n{exc}")
+            messagebox.showerror(__app_name__, f"Copy failed:\n{exc}\n\nMint:\n{v}")
 
-    def _on_mint_click(_event: Any = None) -> None:
-        # Copy after click so the entry can focus; only if field has text
-        if mint_var.get().strip():
-            root.after(10, copy_mint_field)
-
-    mint_entry.bind("<ButtonRelease-1>", _on_mint_click)
+    # Ctrl+C while focused still works; button is the reliable path
     ttk.Button(mint_row, text="Copy mint", command=copy_mint_field).pack(
         side="left", padx=(0, 8)
     )
+    mint_entry.bind("<Control-c>", lambda _e: (copy_mint_field(), "break")[1])
 
     ttk.Button(btn_row, text="Scan mint", style="Accent.TButton", command=do_scan).pack(
         side="left", padx=(0, 6)
