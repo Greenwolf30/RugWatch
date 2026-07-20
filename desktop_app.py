@@ -140,6 +140,24 @@ def run_gui() -> None:
     )
     mint_entry.pack(side="left", fill="x", expand=True, ipady=7, padx=(0, 10))
 
+    def _copy_mint_field(_event: Any = None) -> None:
+        v = mint_var.get().strip()
+        if not v:
+            return
+        try:
+            root.clipboard_clear()
+            root.clipboard_append(v)
+            root.update_idletasks()
+            # log may not exist yet at bind time if called early — safe after GUI fully built
+            try:
+                log(f"Copied mint: {v[:8]}…")  # type: ignore[name-defined]
+            except Exception:  # noqa: BLE001
+                pass
+        except Exception:  # noqa: BLE001
+            pass
+
+    mint_entry.bind("<Button-1>", lambda e: (mint_entry.after(1, _copy_mint_field), None)[-1])
+
     deep_var = tk.BooleanVar(value=True)
     tk.Checkbutton(
         mint_row,
