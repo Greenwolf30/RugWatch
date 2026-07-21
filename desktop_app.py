@@ -589,7 +589,7 @@ def run_gui() -> None:
     banner_fr.pack(fill="x", before=man)
     banner_lbl = tk.Label(
         banner_fr,
-        text="Only upload what you believe to be serial ruggers to the cloud.",
+        text="Only upload what you believe to be serial ruggers to the cloud — not just random wallets.",
         fg="#b8a85c",
         bg="#1a1810",
         font=("Segoe UI", 10, "bold"),
