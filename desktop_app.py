@@ -584,6 +584,22 @@ def run_gui() -> None:
         command=do_upload_file,
     ).pack(side="left", padx=(4, 8))
 
+    # Dim-yellow style banner (upload / cloud discipline)
+    banner_fr = ttk.Frame(root, padding=(10, 4, 10, 2))
+    banner_fr.pack(fill="x", before=man)
+    banner_lbl = tk.Label(
+        banner_fr,
+        text="Only upload what you believe to be serial ruggers to the cloud.",
+        fg="#b8a85c",
+        bg="#1a1810",
+        font=("Segoe UI", 10, "bold"),
+        anchor="w",
+        padx=10,
+        pady=8,
+        justify="left",
+    )
+    banner_lbl.pack(fill="x")
+
     mint_entry.bind("<Return>", lambda _e: do_scan())
     refresh_all()
     refresh_cloud_count()
@@ -591,6 +607,7 @@ def run_gui() -> None:
         f"{__app_name__} ready. MANUAL-ONLY. "
         "Tabs: Log · Wallets · Alerts. "
         "Pills: wallets = in DB now · logged = lifetime · cloud = on GitHub now. "
+        "Only upload what you believe to be serial ruggers to the cloud. "
         "Use Add wallet for one address, or Upload manual wallets next to it "
         "(JSON/txt from Ruggers Export). Website: python run_web.py "
         "(API keys stay on the server). See RugCheck Documentation.md."
