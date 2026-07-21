@@ -543,12 +543,17 @@ class RugWatchDB:
         role: str,
         *,
         evidence: str | None = None,
-    ) -> None:
+    ) -> bool:
+        """
+        Link wallet ↔ mint. Returns True if this is a NEW link
+        (counts as a new flag event for that mint + address).
+        """
         wallet = wallet.strip()
         mint = mint.strip()
         if not wallet or not mint:
-            return
+            return False
         now = utc_now()
+        is_new = False
         with self.session() as conn:
             # ensure wallet row exists (minimal)
             exists = conn.execute(
@@ -563,6 +568,14 @@ class RugWatchDB:
                     """,
                     (wallet, "solana", 0, 0, now, now, "link"),
                 )
+            prev = conn.execute(
+                """
+                SELECT 1 FROM wallet_mint_links
+                WHERE wallet = ? AND mint = ? AND role = ?
+                """,
+                (wallet, mint, role),
+            ).fetchone()
+            is_new = prev is None
             conn.execute(
                 """
                 INSERT INTO wallet_mint_links(wallet, mint, role, evidence, created_at)
@@ -572,6 +585,120 @@ class RugWatchDB:
                 """,
                 (wallet, mint, role, evidence, now),
             )
+        return is_new
+
+    def bump_mint_flag_count(
+        self,
+        mint: str,
+        *,
+        symbol: str | None = None,
+        by: int = 1,
+    ) -> int:
+        """Increment how many times this mint has been used as a flag source."""
+        mint = (mint or "").strip()
+        if not mint or by <= 0:
+            return 0
+        key = f"mint_flag_count:{mint}"
+        with self.session() as conn:
+            row = conn.execute(
+                "SELECT value FROM app_meta WHERE key = ?", (key,)
+            ).fetchone()
+            try:
+                cur = int(row["value"] if row is not None else 0)
+            except (TypeError, ValueError, KeyError):
+                try:
+                    cur = int(row[0]) if row is not None else 0
+                except (TypeError, ValueError, IndexError):
+                    cur = 0
+            nxt = cur + int(by)
+            conn.execute(
+                """
+                INSERT INTO app_meta(key, value) VALUES (?,?)
+                ON CONFLICT(key) DO UPDATE SET value = excluded.value
+                """,
+                (key, str(nxt)),
+            )
+            if symbol:
+                sk = f"mint_symbol:{mint}"
+                conn.execute(
+                    """
+                    INSERT INTO app_meta(key, value) VALUES (?,?)
+                    ON CONFLICT(key) DO UPDATE SET value = excluded.value
+                    """,
+                    (sk, str(symbol).lstrip("$")[:32]),
+                )
+            return nxt
+
+    def get_mint_flag_count(self, mint: str) -> int:
+        mint = (mint or "").strip()
+        if not mint:
+            return 0
+        key = f"mint_flag_count:{mint}"
+        try:
+            with self.connect(self.path) as conn:
+                row = conn.execute(
+                    "SELECT value FROM app_meta WHERE key = ?", (key,)
+                ).fetchone()
+                if not row:
+                    return 0
+                try:
+                    return int(row["value"] if isinstance(row, sqlite3.Row) else row[0])
+                except (TypeError, ValueError, KeyError, IndexError):
+                    return 0
+        except sqlite3.Error:
+            return 0
+
+    def wallet_flag_stats(self, address: str) -> dict[str, Any]:
+        """times_flagged (times_seen) + mint links for an address."""
+        address = (address or "").strip()
+        out: dict[str, Any] = {
+            "address": address,
+            "times_flagged": 0,
+            "mints": [],
+        }
+        if not address:
+            return out
+        for p in self.shard_paths():
+            try:
+                with self.connect(p) as conn:
+                    row = conn.execute(
+                        "SELECT times_seen FROM wallets WHERE address = ?",
+                        (address,),
+                    ).fetchone()
+                    if row is not None:
+                        try:
+                            out["times_flagged"] = max(
+                                out["times_flagged"],
+                                int(
+                                    row["times_seen"]
+                                    if isinstance(row, sqlite3.Row)
+                                    else row[0]
+                                    or 0
+                                ),
+                            )
+                        except (TypeError, ValueError, KeyError, IndexError):
+                            pass
+                    try:
+                        for lr in conn.execute(
+                            "SELECT mint FROM wallet_mint_links WHERE wallet = ?",
+                            (address,),
+                        ):
+                            m = (
+                                lr["mint"]
+                                if isinstance(lr, sqlite3.Row)
+                                else lr[0]
+                            ) or ""
+                            m = str(m).strip()
+                            if m and m not in out["mints"]:
+                                out["mints"].append(m)
+                    except sqlite3.Error:
+                        pass
+            except sqlite3.Error:
+                continue
+        # Prefer link count if higher than times_seen
+        if len(out["mints"]) > int(out["times_flagged"] or 0):
+            out["times_flagged"] = len(out["mints"])
+        return out
 
     # ── seen mints ─────────────────────────────────────────────────────
 
@@ -776,14 +903,29 @@ class RugWatchDB:
         rows = self.list_wallets(min_score=min_score, limit=limit)
         out: list[dict[str, Any]] = []
         for w in rows:
+            addr = w.get("address")
+            stats = self.wallet_flag_stats(str(addr or ""))
+            mints = list(stats.get("mints") or [])
+            initial = mints[0] if mints else None
             out.append(
                 {
-                    "address": w.get("address"),
+                    "address": addr,
                     "chain_id": w.get("chain_id") or "solana",
                     "label": w.get("label") or "manual",
                     "risk_score": int(w.get("risk_score") or 0),
                     "notes": w.get("notes") or "",
                     "source": w.get("source") or "manual",
+                    "times_flagged": int(
+                        stats.get("times_flagged")
+                        or w.get("times_seen")
+                        or 0
+                    ),
+                    "times_seen": int(w.get("times_seen") or 0),
+                    "flagged_from_mint": initial,
+                    "flagged_from_mints": [initial] if initial else [],
+                    "mint_flag_count": (
+                        self.get_mint_flag_count(initial) if initial else 0
+                    ),
                 }
             )
         return out
@@ -840,6 +982,13 @@ class RugWatchDB:
             is_excluded_lp_wallet = None  # type: ignore[assignment]
             _lp_cache = {}
 
+        import re as _re
+
+        mint_re = _re.compile(
+            r"\bmint\s+([1-9A-HJ-NP-Za-km-z]{32,44})\b", _re.I
+        )
+        sym_re = _re.compile(r"\$([A-Za-z0-9]{1,20})\b")
+
         for it in items or []:
             if not isinstance(it, dict):
                 skipped_invalid += 1
@@ -858,13 +1007,26 @@ class RugWatchDB:
                 continue
             seen_batch.add(addr)
 
+            notes = str(it.get("notes") or "imported")
+            mint = (it.get("mint") or it.get("flagged_from_mint") or "").strip()
+            if not mint:
+                mm = mint_re.search(notes)
+                if mm:
+                    mint = mm.group(1).strip()
+            symbol = (it.get("symbol") or "").strip().lstrip("$")
+            if not symbol:
+                sm = sym_re.search(notes)
+                if sm:
+                    symbol = sm.group(1)
+
+            existed = self.wallet_exists(addr)
             if skip_existing:
                 # Prefer cloud check first so callers can tell "already on GitHub"
-                if addr in also:
+                if addr in also and not mint:
                     skipped_cloud += 1
                     skipped_existing += 1
                     continue
-                if self.wallet_exists(addr):
+                if existed and not mint:
                     skipped_local += 1
                     skipped_existing += 1
                     continue
@@ -875,16 +1037,46 @@ class RugWatchDB:
                 )
             except (TypeError, ValueError):
                 score = 70
-            self.upsert_wallet(
-                addr,
-                chain_id=str(it.get("chain_id") or "solana"),
-                label=str(it.get("label") or "manual"),
-                risk_score=score,
-                notes=str(it.get("notes") or "imported"),
-                source=str(it.get("source") or source_default),
-                bump_seen=True,
-            )
-            added += 1
+
+            if not existed:
+                self.upsert_wallet(
+                    addr,
+                    chain_id=str(it.get("chain_id") or "solana"),
+                    label=str(it.get("label") or "manual"),
+                    risk_score=score,
+                    notes=notes,
+                    source=str(it.get("source") or source_default),
+                    bump_seen=True,
+                )
+                added += 1
+            elif mint:
+                # Existing wallet but new mint flag link — still count the flag event
+                self.upsert_wallet(
+                    addr,
+                    chain_id=str(it.get("chain_id") or "solana"),
+                    label=str(it.get("label") or "manual"),
+                    risk_score=score,
+                    notes=notes,
+                    source=str(it.get("source") or source_default),
+                    bump_seen=True,
+                )
+            else:
+                skipped_local += 1
+                skipped_existing += 1
+                also.add(addr)
+                continue
+
+            # Link mint + bump mint flag count on NEW wallet↔mint links only
+            if mint:
+                is_new_link = self.link_wallet_mint(
+                    addr,
+                    mint,
+                    role=str(it.get("label") or "ruggers_flag")[:40],
+                    evidence=notes[:200] if notes else None,
+                )
+                if is_new_link:
+                    self.bump_mint_flag_count(mint, symbol=symbol or None, by=1)
+
             # Newly added — treat as known for rest of batch / also_skip
             also.add(addr)
 
