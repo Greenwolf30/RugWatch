@@ -10,6 +10,17 @@ Complete user guide for the **RugWatch** desktop app **and** the optional **webs
 
 RugWatch is a **private serial-wallet watchlist** for Solana research. You build the list; the app helps you spot those wallets again on new launches and surfaces them inside Actual Token Checker (ATC).
 
+### What this guide covers vs Actual Token Checker
+
+| This RugWatch guide | Actual Token Checker docs |
+|---------------------|---------------------------|
+| Add/Upload wallets, **risk_score 0–100**, Monitor | Analyze tabs, Quick mode, market/holders/bundles |
+| Local DB + Push/Pull cloud | Ruggers sell↔swing lanes, Logs history |
+| Scan mint suggestions | How ATC *displays* Flagged on a mint |
+| Website API used by ATC Upload | Full Ruggers section chart |
+
+Do **not** duplicate the full ATC tab manual here.
+
 ```text
   ┌─────────────────┐     you choose who to save      ┌──────────────────────┐
   │  Scan mint      │  ──suggest only──►  Add / Upload │  Local DB            │
@@ -426,15 +437,49 @@ There is **no** “Upload” tab between Wallets and Alerts. Bulk import is only
 
 **Upload always hits local DB first.** Cloud is optional and may be automatic when enabled — not only when you press Push cloud.
 
-**Score guidance (suggested, not rules):**
+---
+
+## How wallets are rated (risk score)
+
+**RugWatch rates wallets, not tokens.** There is no automatic “this mint is 87/100” score from RugWatch alone.
+
+### Fields on each wallet
+
+| Field | Meaning |
+|-------|---------|
+| **risk_score** | Integer **0–100**. Higher = more serious *for your* research and for Monitor min-score filters. |
+| **times_seen** | How often the wallet has been logged / hit (shown as `xN` on the Wallets tab). |
+| **label** | Short role tag, e.g. `manual`, `creator`, `insider`, upload source. |
+| **notes / source** | Free-text why it was added (scan role, “manual GUI”, Ruggers section name, etc.). |
+
+### Score guidance (suggested, not rules)
 
 | Score | Typical use |
-|---|---|
-| 40–59 | Soft watch / weak confidence |
-| 60–79 | Default “flag this” research |
-| 80–100 | High confidence serial / insider abuse |
+|-------|-------------|
+| **0–39** | Soft / experimental; **Monitor once** ignores by default (min score **40**) |
+| **40–59** | Soft watch / weak confidence |
+| **60–79** | Default “flag this” research (manual add often defaults **~75**) |
+| **80–100** | High confidence serial / insider abuse |
 
-**Monitor defaults ignore wallets below score 40.** They still appear on the Wallets tab and in ATC if score filters allow.
+**Defaults you will see in practice**
+
+| How the wallet entered | Typical score |
+|------------------------|---------------|
+| Manual **Add wallet** | You choose; UI default often **75** |
+| Bulk **Upload** (txt with address only) | Often **75** if no score column |
+| Bulk / cloud JSON with `risk_score` | Uses the file value (0–100) |
+| Cloud list read by ATC with missing score | ATC may treat missing score as **~70** when sorting/displaying |
+| Deep **Scan mint** suggestions | Role-based (e.g. rugged creator higher; insider uses config scores) — **suggest only** unless auto-flag is enabled |
+
+**Monitor once** only matches wallets with score **≥ 40** (default). Lower-score wallets still sit in the DB and can still appear in ATC flags if ATC does not filter them out.
+
+### What Actual Token Checker does with scores
+
+- ATC does **not** re-rate wallets or invent a token-level RugWatch score.
+- On Analyze (RugWatch checkbox ON), ATC **matches** your list (local and/or cloud) to holders on that mint and shows **hold %** (priority colors by bag size).
+- Ruggers **seller / swing** labels are separate heuristics (sold ≥99% of first bag) — not the same as `risk_score`.
+
+Full ATC UI (tabs, Ruggers lanes, Upload buttons): see **Actual Token Checker** `DOCUMENTATION.txt` / site Docs — not duplicated here.
 
 ---
 
@@ -578,15 +623,45 @@ Open **http://127.0.0.1:8787/**
 **From ATC Ruggers (no hand-copy required):**
 
 ```text
-ATC Ruggers → yellow Upload on Creator / Similar / Single
+ATC Ruggers → yellow Upload on any seller section
+  (Creator · Similar · Multi-account · Shared funder · Insider · Launch ·
+   Suspect · Single)
   → POST RugWatch /api/upload (push_cloud=true)
   → local DB import + Push cloud
   → ATC cloud flags grow on next Analyze (after index updates)
 ```
 
+Default import score is often **~75** unless the export JSON includes scores.
 RugWatch must be running at the URL ATC uses (`rugwatchUrl`, default port **8790**).
 
+Optional **site token** (password field on the website) matches ATC’s gate when
+you set `WEB_API_TOKEN` / API token on both sides.
+
+Ruggers lane names, sticky sell↔swing rules, and ATC Holders UI: see **Actual Token Checker** docs (not repeated here).
+
 Website and desktop share the **same** `data/rugwatch.db` when run from the same project folder.
+
+### Website / API surface (integration)
+
+Useful for ATC and power users (same process as `run_web.py`):
+
+| Method | Path | Purpose |
+|--------|------|---------|
+| GET | `/api/health` | Liveness |
+| GET | `/api/stats` | Local counts / status |
+| GET | `/api/wallets` | List wallets (public fields) |
+| GET | `/api/alerts` | Monitor alerts |
+| GET | `/api/cloud-count` | Cloud list size |
+| POST | `/api/wallets` | Add one wallet |
+| POST | `/api/upload` | Bulk import (Ruggers Upload uses this) |
+| POST | `/api/scan` | Scan mint |
+| POST | `/api/monitor` | Monitor once (website cooldown applies) |
+| POST | `/api/push-cloud` | Local → GitHub |
+| POST | `/api/pull-cloud` | GitHub → local |
+| POST | `/api/unflag` | Remove addresses (ATC may call on swing unflag paths) |
+| POST | `/api/clear-db` | Wipe local DB (`confirm: true`) |
+
+Auth: optional `X-API-Token` when configured. Details of each button: sections above.
 
 ---
 
@@ -681,6 +756,26 @@ What this does **not** do: share one multi-user police DB for everyone (cloud is
 - Does **not** upload to Rugcheck.xyz or a shared global “main” database.
 
 ---
+
+## Feature checklist (nothing important missing?)
+
+| Area | Covered in this guide? |
+|------|------------------------|
+| Scan mint / Deep / suggest vs save | Yes — Action buttons |
+| Monitor once (25 launches, score ≥ 40, 5 min web cooldown) | Yes |
+| risk_score 0–100, defaults, bands | Yes — **How wallets are rated** |
+| Add wallet / Upload manual / Export JSON | Yes |
+| Push / Pull cloud / Pull URL / Clear DB | Yes |
+| Pills wallets · logged · cloud | Yes |
+| Alerts multi-line mint identity | Yes |
+| Capacity 100k/file, free hosting limits | Yes — capacity scheme |
+| ATC integration (flags + Ruggers Upload) | Yes — short; ATC UI → ATC docs |
+| Website API table | Yes — Website version |
+| CLI | Yes — CLI section |
+| Auto-flag off by default | Yes — Scan mint |
+
+If something is only in ATC (Ruggers lanes, Overview, Logs history): use ATC docs.
+
 
 ## Feature map (at a glance)
 
