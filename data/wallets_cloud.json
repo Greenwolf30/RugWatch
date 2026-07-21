@@ -314,6 +314,14 @@
       "source": "adtc_ruggers_export"
     },
     {
+      "address": "7yhcD8sXi3rbCacekTwPNpsF55K3nN6WBJxsZHqr26o3",
+      "chain_id": "solana",
+      "label": "ruggers_similar_sellers",
+      "risk_score": 80,
+      "notes": "ruggers similar_sellers \u00b7 $RIGBY \u00b7 mint 6mg9QVNenZuH1GiRuY6cb4Td57gra3kwDLF4KntLpump \u00b7 100.0% sold of first bag \u00b7 not_listed",
+      "source": "adtc_ruggers_export"
+    },
+    {
       "address": "8AhEWfcMiu68aa47YhNM2tM2qHhm2ajUkXkwwVGLWj54",
       "chain_id": "solana",
       "label": "ruggers_similar_sellers",
@@ -487,6 +495,14 @@
       "label": "ruggers_similar_sellers",
       "risk_score": 80,
       "notes": "ruggers similar_sellers \u00b7 $BULLZARD \u00b7 mint 3TVrHiTENThXzrJjGqHcVA8dpYxpgGt9jTgcsMhqpump \u00b7 100.0% sold of first bag \u00b7 not_listed",
+      "source": "adtc_ruggers_export"
+    },
+    {
+      "address": "BEQcyjDafrZvbyLP3XAxzztjjh27wkVDRzG7U6PdBpn8",
+      "chain_id": "solana",
+      "label": "ruggers_similar_sellers",
+      "risk_score": 80,
+      "notes": "ruggers similar_sellers \u00b7 $RIGBY \u00b7 mint 6mg9QVNenZuH1GiRuY6cb4Td57gra3kwDLF4KntLpump \u00b7 100.0% sold of first bag \u00b7 not_listed",
       "source": "adtc_ruggers_export"
     },
     {
@@ -778,7 +794,7 @@
       "source": "adtc_ruggers_export"
     }
   ],
-  "count": 97,
+  "count": 99,
   "shard": 1,
   "total_shards": 1,
   "note": "RugWatch wallet list \u2014 cloud shard (same project on GitHub)"
