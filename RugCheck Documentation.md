@@ -41,7 +41,7 @@ RugWatch is a **private serial-wallet watchlist** for Solana research. You build
 |------|------|----------------|
 | 1. Research | **Scan mint** | Looks up one token; **suggests** wallets (does not auto-save by default). |
 | 2. Save | **Add wallet** / **Upload manual wallets** | Writes addresses into **your** local DB (and can push cloud). |
-| 3. Watch | **Monitor once** | Checks up to **25 never-seen** launches (newest first) vs the **cloud** wallet list (score ≥ 40). **Website: 5 min cooldown** between runs. |
+| 3. Watch | **Monitor once** | Checks up to **25 never-seen** launches (newest first) vs the **local** wallet DB (score ≥ 40). **Website: 5 min cooldown** between runs. |
 | 4. Investigate | **Alerts** | On a hit: full **mint**, **wallet**, symbol, Solscan + DexScreener links. |
 | 5. ATC | Separate app | Flags those wallets on Holders when they appear on a mint you analyze. |
 
@@ -224,19 +224,18 @@ Deep mode may need optional provider setup on the machine/server. Without it, de
 
 ### Monitor once
 
-**Purpose:** One pass that aims for up to **25 brand-new launches** (mints not yet in `seen_mints`), then stop. Checks whether any wallet on your **cloud list** (score ≥ **40** by default) reappears as **creator** / light insider.
+**Purpose:** One pass that aims for up to **25 brand-new launches** (mints not yet in `seen_mints`), then stop. Checks whether any wallet in your **local DB** (score ≥ **40** by default) reappears as **creator** / light insider.
 
-**When to use:** After wallets are on the **cloud** (Push cloud / uploads that push). On the **website**, wait for the **5‑minute cooldown** between clicks (button shows a countdown). Empty Alerts until you both have a cloud list **and** a hit.
+**When to use:** After you have saved wallets locally (Add / Upload / Pull cloud). On the **website**, wait for the **5‑minute cooldown** between clicks (button shows a countdown). Empty Alerts until you both have a local list **and** a hit.
 
 **What happens step by step:**
 
-1. Loads **known** wallets from the **cloud** list (GitHub shards / `RUGWATCH_WALLETS_URL`) with score ≥ 40 → `cloud_wallets=…` / `known_wallets=…`.  
-   - Does **not** use the local DB as the match list (local is only for `seen_mints` + writing alerts).  
+1. Loads **known** wallets from the **local** multi-DB (score ≥ 40) → `local_wallets=…` / `known_wallets=…`.  
 2. Fetches a **wide pool** of recent pump-style pairs from **DexScreener** (`pump.fun` + `pumpswap` searches), sorted **newest first**.  
 3. **Skips mints already in `seen_mints`** and keeps up to **25 never-seen** launches → `new_scanned` / `launches_scanned`.  
    - If the pool has fewer than 25 never-seen mints, it processes all that are available and logs a **shortfall** note.  
 4. For each **new** launch: resolves **creator** (Pump.fun APIs) and runs light **Rugcheck** (new mints only).  
-5. If creator/insider is on the **cloud** known set → **Alert** with full mint, wallet, symbol, explorer links → `alerts=…`.  
+5. If creator/insider is in the **local** known set → **Alert** with full mint, wallet, symbol, explorer links → `alerts=…`.  
 6. If `alerts > 0`, app switches to the **Alerts** tab.  
 7. **Website only:** starts a **5‑minute cooldown** (server + UI). Next click before that returns **429** with remaining wait.  
 8. Stops (GUI does not loop; CLI `monitor` can run continuously with the same logic).
@@ -245,16 +244,15 @@ Deep mode may need optional provider setup on the machine/server. Without it, de
 
 | Source | Role |
 |--------|------|
-| **Cloud wallet list** | Match list (score ≥ 40) — GitHub cloud or public wallets URL |
+| **Local DB** | Match list (score ≥ 40) + `seen_mints` skip list + storing alerts |
 | **DexScreener** | Discover recent Solana pump.fun / pumpswap pairs (2 search calls per poll) |
 | **Pump.fun front APIs** | Creator metadata (best-effort) |
 | **Rugcheck** | Creator + light insider holders — **new mints only** |
-| **Local DB** | `seen_mints` skip list + storing alerts / activity (not the match list) |
 
 **Log line example (website):**
 
 ```text
-Monitor · new_scanned=25/25 skipped_seen=40 pool=100 cloud_wallets=37 src=repo alerts=0
+Monitor · new_scanned=25/25 skipped_seen=40 pool=100 local_wallets=37 src=local alerts=0
 ```
 
 | Field | Meaning |
@@ -262,9 +260,9 @@ Monitor · new_scanned=25/25 skipped_seen=40 pool=100 cloud_wallets=37 src=repo 
 | **new_scanned** / **launches_scanned** | Never-seen launches checked this run (target **25**). |
 | **skipped_seen** | Candidates already in `seen_mints` (not re-checked as “new”). |
 | **pool** | How many launches DexScreener returned before filtering. |
-| **cloud_wallets** / **known_wallets** | Cloud list size used for matching (score ≥ 40). |
-| **src** | Where cloud was loaded from (`repo`, `wallets_url`, `public_raw`, …). |
-| **alerts** | Hits this run. **0** = none of your cloud wallets matched those launches. |
+| **local_wallets** / **known_wallets** | Local DB watchlist size used for matching (score ≥ 40). |
+| **src** | Match source (`local` by default). |
+| **alerts** | Hits this run. **0** = none of your local wallets matched those launches. |
 
 **What Monitor does *not* do:**
 
@@ -531,8 +529,8 @@ This is the same Monitor behavior described under [Monitor once](#monitor-once).
 | **new_scanned** / **launches_scanned** | Up to **25 never-seen** launches (newest first). Not a re-check of the same 25 every click. |
 | **skipped_seen** | Already in `seen_mints` — skipped this run. |
 | **pool** | Size of the DexScreener candidate set before filtering. |
-| **cloud_wallets** | Cloud list size used for matching (**score ≥ 40**). Local DB is not the match list. |
-| **alerts** | Hits this run. **0** is normal if none of your cloud wallets launched in that batch. |
+| **local_wallets** / **known_wallets** | Local DB watchlist size (**score ≥ 40**). |
+| **alerts** | Hits this run. **0** is normal if none of your local wallets launched in that batch. |
 | **Cooldown (website)** | **5 minutes** after a successful run; button shows countdown; server rejects early clicks with **429**. |
 
 If fewer than 25 never-seen mints are available, the log note explains the shortfall — wait for the cooldown and try again when more new pairs appear.
@@ -557,7 +555,7 @@ Open **http://127.0.0.1:8787/**
 | Control | What it does |
 |---------|----------------|
 | Scan mint | Research one mint |
-| Monitor once | Up to **25 never-seen** launches vs **cloud** list; **5 min cooldown** after each run |
+| Monitor once | Up to **25 never-seen** launches vs **local** DB; **5 min cooldown** after each run |
 | Refresh | Reload stats / wallets / alerts |
 | **Push cloud** | Local DB → your cloud wallet list |
 | **Pull cloud** | Cloud → merge into local DB |

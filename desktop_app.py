@@ -389,7 +389,7 @@ def run_gui() -> None:
 
         def work() -> None:
             try:
-                r = monitor_once(db, limit=25, min_score=40, known_source="cloud")
+                r = monitor_once(db, limit=25, min_score=40, known_source="local")
                 q.put(("monitor", r))
             except Exception as exc:  # noqa: BLE001
                 q.put(("err", str(exc)))

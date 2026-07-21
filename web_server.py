@@ -638,9 +638,9 @@ class RugWatchHandler(BaseHTTPRequestHandler):
                     "off",
                 }
 
-            known_source = str(body.get("known_source") or "cloud").strip().lower()
+            known_source = str(body.get("known_source") or "local").strip().lower()
             if known_source not in {"cloud", "local", "both"}:
-                known_source = "cloud"
+                known_source = "local"
 
             result = monitor_once(
                 db,

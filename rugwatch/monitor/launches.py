@@ -112,23 +112,23 @@ def monitor_once(
     resolve_creator: bool = True,
     only_new: bool = True,
     pool_size: int | None = None,
-    known_source: str = "cloud",
+    known_source: str = "local",
 ) -> dict[str, Any]:
     """
     Single poll of recent launches → match against known wallets → alerts.
 
     known_source:
-      "cloud" (default) — GitHub cloud / RUGWATCH_WALLETS_URL list only
-      "local" — local multi-DB shards only
-      "both" — union of cloud + local (cloud wins on score ties)
+      "local" (default) — local multi-DB shards only
+      "cloud" — GitHub cloud / RUGWATCH_WALLETS_URL list only
+      "both" — union of cloud + local (higher score wins)
 
     only_new=True (default): only process mints not yet in seen_mints, aiming for
     up to `limit` brand-new launches per click (newest DexScreener first).
     """
     db = db or RugWatchDB()
-    src = (known_source or "cloud").strip().lower()
+    src = (known_source or "local").strip().lower()
     if src not in {"cloud", "local", "both"}:
-        src = "cloud"
+        src = "local"
 
     known: dict[str, dict[str, Any]] = {}
     cloud_meta: dict[str, Any] = {"ok": False, "source": "none", "count": 0}
@@ -171,6 +171,22 @@ def monitor_once(
             "known_source": src,
             "cloud_source": cloud_meta.get("source"),
             "cloud_wallet_count": int(cloud_meta.get("count") or 0),
+            "alerts": [],
+            "alert_count": 0,
+            "stats": db.stats(),
+        }
+
+    if src == "local" and not known:
+        return {
+            "ok": False,
+            "error": (
+                "Local wallet list empty (score≥"
+                f"{min_score}). Add wallets or Pull cloud first."
+            ),
+            "launches_scanned": 0,
+            "launches_target": limit,
+            "known_wallets": 0,
+            "known_source": src,
             "alerts": [],
             "alert_count": 0,
             "stats": db.stats(),

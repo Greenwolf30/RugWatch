@@ -324,7 +324,7 @@
       btn.disabled = false;
       btn.textContent = "Monitor once";
       btn.title =
-        "Scan up to 25 never-seen launches vs cloud list. 5 min cooldown after each run.";
+        "Scan up to 25 never-seen launches vs local DB (score≥40). 5 min cooldown after each run.";
       if (_monitorCooldownTimer) {
         clearInterval(_monitorCooldownTimer);
         _monitorCooldownTimer = null;
@@ -364,13 +364,13 @@
       btn.textContent = "Monitoring…";
     }
     log(
-      "Monitor: up to 25 never-seen launches vs CLOUD wallet list (score≥40)…"
+      "Monitor: up to 25 never-seen launches vs LOCAL wallet list (score≥40)…"
     );
     try {
       const data = await apiPost("/api/monitor", {
         limit: 25,
         only_new: true,
-        known_source: "cloud",
+        known_source: "local",
       });
       log(
         "Monitor · new_scanned=" +
@@ -381,10 +381,10 @@
           (data.skipped_already_seen ?? "") +
           " pool=" +
           (data.candidates_fetched ?? "") +
-          " cloud_wallets=" +
+          " local_wallets=" +
           (data.known_wallets ?? "") +
           " src=" +
-          (data.cloud_source || data.known_source || "cloud") +
+          (data.known_source || "local") +
           " alerts=" +
           (data.alert_count ?? 0)
       );
