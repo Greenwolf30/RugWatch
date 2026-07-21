@@ -69,7 +69,10 @@ Everything is **local by default** (`data/rugwatch.db`). Cloud only talks to **y
 3. **Watch new launches** — alert when a saved wallet shows up again as creator (serial-style reuse).  
 4. **Back up / restore** — Export JSON, Push/Pull cloud, Pull URL.  
 5. **Feed Actual Token Checker** — ATC reads **local DB + cloud list** and tags flagged holders.  
-6. **Optional website** — same workflows in a browser (`python run_web.py`).
+6. **Optional website** — core workflows in a browser (`python run_web.py`).
+   Website has Scan / Monitor / Refresh / Push / Pull cloud / Clear DB /
+   Add / Upload. **Export JSON** and **Pull URL** are **desktop (and CLI)** —
+   not buttons on the website toolbar.
 
 ---
 
@@ -149,8 +152,9 @@ These three numbers are **database / cloud inventory**, not Monitor results.
 │  In DB now · Lifetime · Cloud now · high_risk · incidents · alerts│
 ├──────────────────────────────────────────────────────────────────┤
 │  MINT  [ paste token mint address ________ ]  ☑ Deep             │
-│  [Scan mint] [Monitor once] [Refresh] [Clear DB]                 │
-│  [Export JSON] [Push cloud] [Pull cloud] [Pull URL]              │
+│  [Scan mint] [Monitor once] [Refresh]                            │
+│  [Push cloud] [Pull cloud] [Clear DB]                            │
+│  Desktop also: [Export JSON] [Pull URL]  (not on website UI)     │
 ├──────────────────────────────────────────────────────────────────┤
 │  Manual wallet [ address ] score [75] [Add wallet]               │
 │                               [Upload manual wallets]            │
@@ -355,6 +359,9 @@ To empty the cloud list too: Clear DB, then **Push cloud** (overwrites the cloud
 
 ### Export JSON
 
+**Desktop / CLI only** — the **website toolbar does not show Export JSON**.
+On the website, back up with **Push cloud** (or export from desktop/CLI).
+
 Writes a portable backup of flagged wallets to:
 
 ```text
@@ -363,7 +370,7 @@ C:\Users\<you>\RugWatch\data\wallets_export.json
 
 - Local file only — **does not** upload  
 - Safe “before Clear DB” backup  
-- Can be re-imported later via CLI `import-wallets`
+- Can be re-imported later via CLI `import-wallets` or **Upload manual wallets**
 
 ---
 
@@ -398,6 +405,9 @@ If cloud is not set up, the app explains what is missing.
 ---
 
 ### Pull URL
+
+**Desktop / CLI only** — the **website toolbar does not show Pull URL**.
+On the website use **Pull cloud** (GitHub) or **Upload manual wallets** (file).
 
 **Direction:** any HTTPS JSON wallet list → local DB.
 
@@ -584,7 +594,7 @@ If fewer than 25 never-seen mints are available, the log note explains the short
 
 ## Website version
 
-Browser UI for the same workflows as the desktop app.
+Browser UI for **core** RugWatch workflows (not 100% of desktop buttons).
 
 ### Start the site
 
@@ -593,22 +603,28 @@ cd C:\Users\levyr\RugWatch
 python run_web.py
 ```
 
-Open **http://127.0.0.1:8787/**
+Default port comes from `PORT` / `WEB_PORT` env or **8080** / app default —
+commonly **http://127.0.0.1:8790/** when you pass `--port 8790` (what ATC
+`rugwatchUrl` expects). Check the terminal line printed at startup.
 
-### Website controls (same meaning as desktop)
+### Website controls (what is actually on the web UI)
 
-| Control | What it does |
-|---------|----------------|
-| Scan mint | Research one mint |
-| Monitor once | Up to **25 never-seen** launches vs **local** DB; **5 min cooldown** after each run |
-| Refresh | Reload stats / wallets / alerts |
-| **Push cloud** | Local DB → your cloud wallet list |
-| **Pull cloud** | Cloud → merge into local DB |
-| **Clear DB** | Wipe **local** DB only (cloud unchanged until Push) |
-| Add wallet | One address → local DB |
-| Upload manual wallets | File picker next to Add wallet (no Upload tab) |
-| Tabs | **Log · Wallets · Alerts** only |
-| Pills | wallets · logged · cloud |
+| Control | On website? | What it does |
+|---------|-------------|--------------|
+| Scan mint | Yes | Research one mint |
+| Deep checkbox | Yes | Deeper Helius-backed scan when server has keys |
+| Monitor once | Yes | Up to **25 never-seen** launches vs **local** DB; **5 min cooldown** |
+| Refresh | Yes | Reload stats / wallets / alerts |
+| **Push cloud** | Yes | Local DB → your cloud wallet list |
+| **Pull cloud** | Yes | Cloud → merge into local DB |
+| **Clear DB** | Yes | Wipe **local** DB only (cloud unchanged until Push) |
+| Add wallet + score | Yes | One address → local DB (default score **75**) |
+| Upload manual wallets | Yes | File picker next to Add wallet |
+| **Export JSON** | **No** | Desktop / CLI only |
+| **Pull URL** | **No** | Desktop / CLI only |
+| Tabs | Yes | **Log · Wallets · Alerts** only |
+| Site passcode | Yes | Optional if `WEB_API_TOKEN` set |
+| Pills | Yes | wallets · logged · cloud |
 
 ### Website workflow → Actual Token Checker flags
 
@@ -764,8 +780,9 @@ What this does **not** do: share one multi-user police DB for everyone (cloud is
 | Scan mint / Deep / suggest vs save | Yes — Action buttons |
 | Monitor once (25 launches, score ≥ 40, 5 min web cooldown) | Yes |
 | risk_score 0–100, defaults, bands | Yes — **How wallets are rated** |
-| Add wallet / Upload manual / Export JSON | Yes |
-| Push / Pull cloud / Pull URL / Clear DB | Yes |
+| Add wallet / Upload manual | Yes |
+| Export JSON / Pull URL | Desktop/CLI (not website toolbar) |
+| Push / Pull cloud / Clear DB | Yes |
 | Pills wallets · logged · cloud | Yes |
 | Alerts multi-line mint identity | Yes |
 | Capacity 100k/file, free hosting limits | Yes — capacity scheme |
