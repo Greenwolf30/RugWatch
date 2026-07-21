@@ -370,6 +370,14 @@
       "source": "adtc_ruggers_export"
     },
     {
+      "address": "78N177fzNJpp8pG49xDv1efYcTMSzo9tPTKEA9mAVkh2",
+      "chain_id": "solana",
+      "label": "ruggers_similar_sellers",
+      "risk_score": 80,
+      "notes": "ruggers similar_sellers \u00b7 $Liquititty \u00b7 mint 6Lg8hJABEbBWHCgK7wSDp3eqUAwBvghTdeuHH3vzpump \u00b7 100.0% sold of first bag \u00b7 not_listed",
+      "source": "adtc_ruggers_export"
+    },
+    {
       "address": "7EwKCzJfDUCUFPxfZJzxuaVYmNgt4Hp736pCNSQkvTCx",
       "chain_id": "solana",
       "label": "ruggers_single_sellers",
@@ -543,6 +551,14 @@
       "label": "ruggers_single_sellers",
       "risk_score": 80,
       "notes": "ruggers single_sellers \u00b7 $Shakira \u00b7 mint 4gbeSvVfCXY9Spzmf8t7rsfwdD4LxbqEqx5wvZXtpump \u00b7 100.0% sold of first bag \u00b7 not_listed",
+      "source": "adtc_ruggers_export"
+    },
+    {
+      "address": "8i9pWxJjQvt3uXmGkskDmMADKNb8dP6CByNyvC4nVztE",
+      "chain_id": "solana",
+      "label": "ruggers_similar_sellers",
+      "risk_score": 80,
+      "notes": "ruggers similar_sellers \u00b7 $Liquititty \u00b7 mint 6Lg8hJABEbBWHCgK7wSDp3eqUAwBvghTdeuHH3vzpump \u00b7 100.0% sold of first bag \u00b7 not_listed",
       "source": "adtc_ruggers_export"
     },
     {
@@ -906,6 +922,14 @@
       "source": "adtc_ruggers_export"
     },
     {
+      "address": "EU6geiKUeepSM9fHhj9VCHzz4TyPZE3RDSAAzX4ZmykZ",
+      "chain_id": "solana",
+      "label": "ruggers_similar_sellers",
+      "risk_score": 80,
+      "notes": "ruggers similar_sellers \u00b7 $Liquititty \u00b7 mint 6Lg8hJABEbBWHCgK7wSDp3eqUAwBvghTdeuHH3vzpump \u00b7 100.0% sold of first bag \u00b7 not_listed",
+      "source": "adtc_ruggers_export"
+    },
+    {
       "address": "EaVboaPxFCYanjoNWdkxTbPvt57nhXGu5i6m9m6ZS2kK",
       "chain_id": "solana",
       "label": "ruggers_similar_sellers",
@@ -959,6 +983,14 @@
       "label": "ruggers_launch_window_sellers",
       "risk_score": 80,
       "notes": "ruggers launch_window_sellers \u00b7 $SCOOBERT \u00b7 mint MPVe5KBa23gXyfGoxBpL9FoBhKci7M6XTVZVw1Vpump \u00b7 100.0% sold of first bag \u00b7 not_listed",
+      "source": "adtc_ruggers_export"
+    },
+    {
+      "address": "FHBAoKnbgPMnjGCsAEc5h9DiM89HihBnZ9oorTWdqvzs",
+      "chain_id": "solana",
+      "label": "ruggers_similar_sellers",
+      "risk_score": 80,
+      "notes": "ruggers similar_sellers \u00b7 $Liquititty \u00b7 mint 6Lg8hJABEbBWHCgK7wSDp3eqUAwBvghTdeuHH3vzpump \u00b7 100.0% sold of first bag \u00b7 not_listed",
       "source": "adtc_ruggers_export"
     },
     {
@@ -1250,7 +1282,7 @@
       "source": "adtc_ruggers_export"
     }
   ],
-  "count": 156,
+  "count": 160,
   "shard": 1,
   "total_shards": 1,
   "note": "RugWatch wallet list \u2014 cloud shard (same project on GitHub)"
