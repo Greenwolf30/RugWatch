@@ -175,6 +175,21 @@ def import_wallets_from_file(path: str | Path, db: RugWatchDB | None = None) -> 
             "skipped": 0,
             "error": "No wallets found in file",
         }
+    try:
+        from .lp_filter import filter_wallet_items
+
+        items, skipped_lp = filter_wallet_items(items)
+    except Exception:  # noqa: BLE001
+        skipped_lp = 0
+    if not items:
+        return {
+            "ok": False,
+            "path": str(p),
+            "imported": 0,
+            "skipped": skipped_lp,
+            "skipped_lp": skipped_lp,
+            "error": "No wallets left after excluding Pump.fun / liquidity vaults",
+        }
     also_skip: set[str] = set()
     try:
         from .cloud_store import fetch_cloud_address_set
@@ -188,7 +203,13 @@ def import_wallets_from_file(path: str | Path, db: RugWatchDB | None = None) -> 
         skip_existing=True,
         also_skip=also_skip,
     )
-    return {"ok": True, "path": str(p), **stats, "cloud_known": len(also_skip)}
+    return {
+        "ok": True,
+        "path": str(p),
+        **stats,
+        "cloud_known": len(also_skip),
+        "skipped_lp": skipped_lp + int(stats.get("skipped_lp") or 0),
+    }
 
 
 def import_wallets_from_text(
@@ -209,6 +230,20 @@ def import_wallets_from_text(
             "skipped": 0,
             "error": "No wallet addresses found",
         }
+    try:
+        from .lp_filter import filter_wallet_items
+
+        items, skipped_lp = filter_wallet_items(items)
+    except Exception:  # noqa: BLE001
+        skipped_lp = 0
+    if not items:
+        return {
+            "ok": False,
+            "imported": 0,
+            "skipped": skipped_lp,
+            "skipped_lp": skipped_lp,
+            "error": "No wallets left after excluding Pump.fun / liquidity vaults",
+        }
     also_skip: set[str] = set()
     if check_cloud:
         try:
@@ -223,7 +258,12 @@ def import_wallets_from_text(
         skip_existing=skip_existing,
         also_skip=also_skip,
     )
-    out: dict[str, Any] = {"ok": True, **stats, "cloud_known": len(also_skip)}
+    out: dict[str, Any] = {
+        "ok": True,
+        **stats,
+        "cloud_known": len(also_skip),
+        "skipped_lp": skipped_lp + int(stats.get("skipped_lp") or 0),
+    }
     if (stats.get("imported") or 0) == 0 and (stats.get("skipped_existing") or 0) > 0:
         out["note"] = "No new wallets — all already in local DB and/or cloud."
     return out

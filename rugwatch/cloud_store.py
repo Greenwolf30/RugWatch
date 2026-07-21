@@ -377,12 +377,23 @@ def push_to_repo(db: RugWatchDB | None = None) -> dict[str, Any]:
             "local_count": local_n,
         }
 
+    cloud_raw_n = len(cloud_wallets)
+    # Drop Pump.fun / known LP vaults from both sides before merge (allowed shrink)
+    lp_stripped = 0
+    try:
+        from .lp_filter import filter_wallet_items
+
+        cloud_wallets, c_lp = filter_wallet_items(cloud_wallets)
+        local, l_lp = filter_wallet_items(local)
+        lp_stripped = int(c_lp or 0) + int(l_lp or 0)
+    except Exception:  # noqa: BLE001
+        pass
     cloud_before = len(cloud_wallets)
-    # Union: cloud ∪ local — addresses only grow (or stay)
+    # Union: cloud ∪ local — addresses only grow (or stay) after LP scrub
     wallets = _merge_wallet_dicts(cloud_wallets, local)
     merged_n = len(wallets)
 
-    # Hard safety: never write fewer addresses than were already in cloud
+    # Hard safety: never write fewer addresses than cloud *after* LP strip
     if cloud_before > 0 and merged_n < cloud_before:
         return {
             "ok": False,
@@ -775,6 +786,68 @@ def pull_from_gist(
 
 # ── Unified API ───────────────────────────────────────────────────────
 
+def scrub_lp_wallets_local_and_cloud(
+    db: RugWatchDB | None = None,
+) -> dict[str, Any]:
+    """
+    Remove Pump.fun / known DEX liquidity & program vaults from local DB
+    and rewrite cloud without them (explicit shrink).
+    """
+    db = db or RugWatchDB()
+    from .lp_filter import filter_wallet_items, scrub_lp_from_db
+
+    local_scrub = scrub_lp_from_db(db)
+    drop = list(local_scrub.get("addresses") or [])
+
+    # Also drop any cloud-only LP rows (label/notes / known programs)
+    cloud_drop: list[str] = []
+    try:
+        if cloud_mode() == "repo" and github_token() and github_repo():
+            cloud_wallets, _meta = _load_all_cloud_wallets_repo()
+            kept, n_skip = filter_wallet_items(cloud_wallets)
+            for w in cloud_wallets:
+                a = (w.get("address") or w.get("wallet") or "").strip()
+                if not a:
+                    continue
+                if a not in {
+                    (x.get("address") or x.get("wallet") or "").strip() for x in kept
+                }:
+                    cloud_drop.append(a)
+            drop = list({*drop, *cloud_drop})
+            # If cloud has LP rows, rewrite without them
+            if n_skip or cloud_drop:
+                cloud_rm = remove_addresses_from_cloud(drop, db)
+                return {
+                    "ok": bool(cloud_rm.get("ok")),
+                    "local": local_scrub,
+                    "cloud": cloud_rm,
+                    "removed_total": len(drop),
+                    "skipped_lp_cloud": n_skip,
+                }
+    except Exception as exc:  # noqa: BLE001
+        return {
+            "ok": False,
+            "error": str(exc),
+            "local": local_scrub,
+            "removed_total": int(local_scrub.get("removed") or 0),
+        }
+
+    if drop:
+        cloud_rm = remove_addresses_from_cloud(drop, db)
+        return {
+            "ok": bool(cloud_rm.get("ok")),
+            "local": local_scrub,
+            "cloud": cloud_rm,
+            "removed_total": len(drop),
+        }
+    return {
+        "ok": True,
+        "local": local_scrub,
+        "removed_total": 0,
+        "note": "No Pump.fun / liquidity vaults found to remove",
+    }
+
+
 def push_to_cloud(db: RugWatchDB | None = None) -> dict[str, Any]:
     mode = cloud_mode()
     if mode == "off":
@@ -784,13 +857,29 @@ def push_to_cloud(db: RugWatchDB | None = None) -> dict[str, Any]:
             "ok": False,
             "error": "Set GITHUB_TOKEN in .env (see UPLOAD-RUGWATCH-TO-GITHUB.txt)",
         }
+    # Always scrub LP vaults from local before merge-push so they cannot re-enter
+    try:
+        from .lp_filter import scrub_lp_from_db
+
+        scrub_lp_from_db(db or RugWatchDB())
+    except Exception:  # noqa: BLE001
+        pass
     if mode == "repo":
         if not github_repo():
             return {
                 "ok": False,
                 "error": "Set RUGWATCH_GITHUB_REPO=YourUser/RugWatch (whole project on GitHub)",
             }
-        return push_to_repo(db)
+        result = push_to_repo(db)
+        # After merge push, strip any LP rows still living only on cloud
+        try:
+            scrub = scrub_lp_wallets_local_and_cloud(db)
+            if isinstance(result, dict):
+                result["lp_scrub"] = scrub
+        except Exception as exc:  # noqa: BLE001
+            if isinstance(result, dict):
+                result["lp_scrub"] = {"ok": False, "error": str(exc)}
+        return result
     return push_to_gist(db)
 
 

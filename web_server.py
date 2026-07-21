@@ -458,6 +458,7 @@ class RugWatchHandler(BaseHTTPRequestHandler):
 
         if path == "/api/upload":
             from rugwatch.remote_wallets import import_wallets_from_text, parse_wallet_payload
+            from rugwatch.lp_filter import filter_wallet_items
 
             items: list = []
             if isinstance(body.get("wallets"), list):
@@ -497,8 +498,18 @@ class RugWatchHandler(BaseHTTPRequestHandler):
             if not items and isinstance(body.get("format"), str):
                 # Full rugwatch_wallets_v1 body
                 items = parse_wallet_payload(body)
+            # Strip Pump.fun / known liquidity vaults before import
+            items, skipped_lp_pre = filter_wallet_items(items)
             if not items:
-                self._json(400, {"ok": False, "error": "No wallets found", "imported": 0})
+                self._json(
+                    400,
+                    {
+                        "ok": False,
+                        "error": "No wallets left after excluding Pump.fun / liquidity vaults",
+                        "imported": 0,
+                        "skipped_lp": skipped_lp_pre,
+                    },
+                )
                 return
             src = str(body.get("source") or "web_upload")
             # Load live cloud addresses so we only skip true cloud duplicates
@@ -516,6 +527,9 @@ class RugWatchHandler(BaseHTTPRequestHandler):
                 source_default=src,
                 skip_existing=True,
                 also_skip=also_skip,
+            )
+            stats["skipped_lp"] = int(stats.get("skipped_lp") or 0) + int(
+                skipped_lp_pre or 0
             )
             out: dict[str, Any] = {
                 "ok": True,
@@ -684,6 +698,31 @@ class RugWatchHandler(BaseHTTPRequestHandler):
                 "retry_after_seconds": MONITOR_COOLDOWN_SEC,
             }
             self._json(200, safe)
+            return
+
+        if path == "/api/scrub-lp":
+            from rugwatch.cloud_store import scrub_lp_wallets_local_and_cloud
+
+            result = scrub_lp_wallets_local_and_cloud(db)
+            self._json(
+                200 if result.get("ok") else 400,
+                sanitize_public(
+                    {
+                        "ok": bool(result.get("ok")),
+                        "removed_total": result.get("removed_total"),
+                        "local": result.get("local"),
+                        "cloud": {
+                            "ok": (result.get("cloud") or {}).get("ok"),
+                            "removed": (result.get("cloud") or {}).get("removed"),
+                            "error": (result.get("cloud") or {}).get("error"),
+                        }
+                        if result.get("cloud")
+                        else None,
+                        "note": result.get("note"),
+                        "error": result.get("error"),
+                    }
+                ),
+            )
             return
 
         if path == "/api/push-cloud":

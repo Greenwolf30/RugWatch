@@ -269,6 +269,21 @@ class RugWatchDB:
         address = address.strip()
         if not address:
             return
+        # Never store Pump.fun / known DEX liquidity or program vaults
+        try:
+            from .lp_filter import is_excluded_lp_wallet
+
+            if is_excluded_lp_wallet(
+                {
+                    "address": address,
+                    "label": label,
+                    "notes": notes,
+                    "source": source,
+                }
+            ):
+                return
+        except Exception:  # noqa: BLE001
+            pass
         now = utc_now()
         existing_path = self._find_wallet_shard(address)
         target = existing_path if existing_path is not None else self._shard_for_new_wallet()
@@ -814,8 +829,16 @@ class RugWatchDB:
         skipped_local = 0
         skipped_cloud = 0
         skipped_batch_dup = 0
+        skipped_lp = 0
         also = {a.strip() for a in (also_skip or set()) if a and str(a).strip()}
         seen_batch: set[str] = set()
+        try:
+            from .lp_filter import is_excluded_lp_wallet
+
+            _lp_cache: dict[str, set[str]] = {}
+        except Exception:  # noqa: BLE001
+            is_excluded_lp_wallet = None  # type: ignore[assignment]
+            _lp_cache = {}
 
         for it in items or []:
             if not isinstance(it, dict):
@@ -824,6 +847,11 @@ class RugWatchDB:
             addr = (it.get("address") or it.get("wallet") or "").strip()
             if not addr or len(addr) < 32:
                 skipped_invalid += 1
+                continue
+            if is_excluded_lp_wallet is not None and is_excluded_lp_wallet(
+                it, pump_lp_cache=_lp_cache
+            ):
+                skipped_lp += 1
                 continue
             if addr in seen_batch:
                 skipped_batch_dup += 1
@@ -860,7 +888,12 @@ class RugWatchDB:
             # Newly added — treat as known for rest of batch / also_skip
             also.add(addr)
 
-        skipped = skipped_invalid + skipped_existing + skipped_batch_dup
+        skipped = (
+            skipped_invalid
+            + skipped_existing
+            + skipped_batch_dup
+            + skipped_lp
+        )
         return {
             "imported": added,
             "skipped": skipped,
@@ -869,4 +902,5 @@ class RugWatchDB:
             "skipped_cloud": skipped_cloud,
             "skipped_invalid": skipped_invalid,
             "skipped_batch_dup": skipped_batch_dup,
+            "skipped_lp": skipped_lp,
         }
