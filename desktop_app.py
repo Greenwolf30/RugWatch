@@ -607,7 +607,7 @@ def run_gui() -> None:
         f"{__app_name__} ready. MANUAL-ONLY. "
         "Tabs: Log · Wallets · Alerts. "
         "Pills: wallets = in DB now · logged = lifetime · cloud = on GitHub now. "
-        "Only upload what you believe to be serial ruggers to the cloud. "
+        "Only upload what you believe to be serial ruggers to the cloud — not just random wallets. "
         "Use Add wallet for one address, or Upload manual wallets next to it "
         "(JSON/txt from Ruggers Export). Website: python run_web.py "
         "(API keys stay on the server). See RugCheck Documentation.md."
