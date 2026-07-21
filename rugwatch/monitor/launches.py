@@ -112,17 +112,70 @@ def monitor_once(
     resolve_creator: bool = True,
     only_new: bool = True,
     pool_size: int | None = None,
+    known_source: str = "cloud",
 ) -> dict[str, Any]:
     """
-    Single poll of recent launches → check DB → alerts.
+    Single poll of recent launches → match against known wallets → alerts.
+
+    known_source:
+      "cloud" (default) — GitHub cloud / RUGWATCH_WALLETS_URL list only
+      "local" — local multi-DB shards only
+      "both" — union of cloud + local (cloud wins on score ties)
 
     only_new=True (default): only process mints not yet in seen_mints, aiming for
     up to `limit` brand-new launches per click (newest DexScreener first).
-    If fewer than `limit` never-seen mints are available in the current pool,
-    processes all that are available and reports shortfall in the result.
     """
     db = db or RugWatchDB()
-    known = db.known_wallet_set(min_score=min_score)
+    src = (known_source or "cloud").strip().lower()
+    if src not in {"cloud", "local", "both"}:
+        src = "cloud"
+
+    known: dict[str, dict[str, Any]] = {}
+    cloud_meta: dict[str, Any] = {"ok": False, "source": "none", "count": 0}
+    if src in {"cloud", "both"}:
+        try:
+            from ..cloud_store import load_cloud_wallet_rows
+
+            cloud_meta = load_cloud_wallet_rows(min_score=min_score)
+            known.update(cloud_meta.get("wallets") or {})
+        except Exception as exc:  # noqa: BLE001
+            cloud_meta = {
+                "ok": False,
+                "source": "error",
+                "error": str(exc),
+                "count": 0,
+                "count_after_score": 0,
+            }
+    if src in {"local", "both"}:
+        local = db.known_wallet_set(min_score=min_score)
+        for a, row in local.items():
+            if a not in known:
+                known[a] = row
+            else:
+                # keep higher score
+                if int(row.get("risk_score") or 0) > int(known[a].get("risk_score") or 0):
+                    known[a] = row
+
+    # Cloud-only mode with empty cloud: fail clearly (do not silently use local)
+    if src == "cloud" and not known:
+        return {
+            "ok": False,
+            "error": (
+                cloud_meta.get("error")
+                or "Cloud wallet list empty or unreachable. "
+                "Push cloud / set RUGWATCH_WALLETS_URL or GITHUB_TOKEN + repo."
+            ),
+            "launches_scanned": 0,
+            "launches_target": limit,
+            "known_wallets": 0,
+            "known_source": src,
+            "cloud_source": cloud_meta.get("source"),
+            "cloud_wallet_count": int(cloud_meta.get("count") or 0),
+            "alerts": [],
+            "alert_count": 0,
+            "stats": db.stats(),
+        }
+
     already = db.known_mint_set() if only_new else set()
 
     # Wider Dex pool so we can fill `limit` never-seen mints when possible
@@ -155,15 +208,28 @@ def monitor_once(
             all_alerts.extend(alerts)
 
     shortfall = max(0, limit - len(launches)) if only_new else 0
-    note = None
+    note_parts: list[str] = []
+    if src == "cloud":
+        note_parts.append(
+            f"Matched against cloud list ({len(known)} wallet(s) score≥{min_score}, "
+            f"source={cloud_meta.get('source')})."
+        )
+    elif src == "both":
+        note_parts.append(
+            f"Matched against cloud+local union ({len(known)} wallet(s) score≥{min_score})."
+        )
+    else:
+        note_parts.append(
+            f"Matched against local DB ({len(known)} wallet(s) score≥{min_score})."
+        )
     if only_new and shortfall > 0:
-        note = (
+        note_parts.append(
             f"Only {len(launches)} never-seen mint(s) in the current DexScreener pool "
             f"(wanted {limit}; skipped {skipped_seen} already-seen). "
             f"Try again after the cooldown when more new pairs appear."
         )
     elif only_new:
-        note = f"Checked {len(launches)} never-seen launch(es) (newest first)."
+        note_parts.append(f"Checked {len(launches)} never-seen launch(es) (newest first).")
 
     return {
         "ok": True,
@@ -174,11 +240,19 @@ def monitor_once(
         "candidates_fetched": len(candidates),
         "only_new": only_new,
         "known_wallets": len(known),
+        "known_source": src,
+        "cloud_source": cloud_meta.get("source"),
+        "cloud_wallet_count": int(
+            cloud_meta.get("count_after_score")
+            if cloud_meta.get("count_after_score") is not None
+            else cloud_meta.get("count")
+            or 0
+        ),
         "alerts": all_alerts,
         "alert_count": len(all_alerts),
         "mints": mints_checked[:limit],
         "shortfall": shortfall,
-        "note": note,
+        "note": " ".join(note_parts),
         "stats": db.stats(),
     }
 

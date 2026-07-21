@@ -318,11 +318,14 @@
       btn.disabled = true;
       btn.textContent = "Monitoring…";
     }
-    log("Monitor: fetching up to 25 never-seen launches (newest first)…");
+    log(
+      "Monitor: up to 25 never-seen launches vs CLOUD wallet list (score≥40)…"
+    );
     try {
       const data = await apiPost("/api/monitor", {
         limit: 25,
         only_new: true,
+        known_source: "cloud",
       });
       log(
         "Monitor · new_scanned=" +
@@ -333,8 +336,10 @@
           (data.skipped_already_seen ?? "") +
           " pool=" +
           (data.candidates_fetched ?? "") +
-          " known_wallets=" +
+          " cloud_wallets=" +
           (data.known_wallets ?? "") +
+          " src=" +
+          (data.cloud_source || data.known_source || "cloud") +
           " alerts=" +
           (data.alert_count ?? 0)
       );

@@ -10,7 +10,7 @@ Not financial advice. Heuristics only — false positives happen.
 
 1. **Scan a mint** (token address) and review suggested wallets.  
 2. **Store** wallets, incidents, links, and alerts in a local database.  
-3. **Monitor** up to **25 never-seen** launches per run against your wallet list  
+3. **Monitor** up to **25 never-seen** launches per run against your **cloud** wallet list  
    (website **Monitor once** has a **5‑minute cooldown**).  
 4. **Push cloud** to keep an online list for Actual Token Checker.
 

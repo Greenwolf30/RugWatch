@@ -64,8 +64,8 @@
         <ul>
           <li>Aims for up to <strong>25 never-seen</strong> launches each click (newest DexScreener pump.fun / pumpswap pairs first).</li>
           <li>Skips mints already stored in <code>seen_mints</code>; if fewer than 25 new exist in the pool, checks all available and notes the shortfall.</li>
-          <li>Matches creators / light insiders against your local wallets with score ≥ <strong>40</strong>.</li>
-          <li>Sources: <strong>DexScreener</strong> (discovery), <strong>Pump.fun</strong> APIs (creator), <strong>Rugcheck</strong> (new mints only).</li>
+          <li>Matches creators / light insiders against your <strong>cloud</strong> wallet list (score ≥ <strong>40</strong>), not the local DB alone.</li>
+          <li>Sources: <strong>Cloud list</strong> (match), <strong>DexScreener</strong> (discovery), <strong>Pump.fun</strong> APIs (creator), <strong>Rugcheck</strong> (new mints only). Local DB tracks seen mints + stores alerts.</li>
           <li><strong>5‑minute cooldown</strong> after each successful run on the website (button countdown; server returns 429 if clicked early).</li>
           <li>Does <strong>not</strong> auto-add new ruggers — only alerts when a wallet you already saved appears on a new launch.</li>
         </ul>

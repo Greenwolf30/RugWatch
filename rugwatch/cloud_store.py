@@ -1126,49 +1126,34 @@ def cloud_status() -> dict[str, Any]:
     }
 
 
-def fetch_cloud_address_set() -> set[str]:
+def load_cloud_wallet_rows(
+    *,
+    min_score: int = 0,
+) -> dict[str, Any]:
     """
-    All wallet addresses currently in the cloud store (repo shards or gist).
-    Used to ignore upload of wallets that already exist in cloud even if local
-    DB was wiped (free Render) or is empty.
-    Returns empty set if cloud is off / unreachable (caller still checks local).
+    Load full wallet rows from cloud (repo shards, gist, or RUGWATCH_WALLETS_URL).
+
+    Returns:
+      {
+        ok, source, error?,
+        wallets: { address: {address, risk_score, label, notes, source, ...} },
+        count, count_after_score
+      }
     """
     mode = cloud_mode()
-    addrs: set[str] = set()
-    if mode == "off":
-        return addrs
-
-    def _absorb(items: list[dict[str, Any]]) -> None:
-        for it in items or []:
-            if not isinstance(it, dict):
-                continue
-            a = (it.get("address") or it.get("wallet") or "").strip()
-            if a and len(a) >= 32:
-                addrs.add(a)
+    items: list[dict[str, Any]] = []
+    source = "none"
+    err: str | None = None
 
     try:
-        if mode == "repo":
-            if not github_token() or not github_repo():
-                return addrs
-            index_path = config.cloud_index_path()
-            index = _get_repo_file_json(index_path)
-            paths: list[str] = []
-            if isinstance(index, dict) and index.get("format") == "rugwatch_wallets_index_v1":
-                for s in index.get("shards") or []:
-                    if isinstance(s, dict) and s.get("path"):
-                        paths.append(str(s["path"]))
-            if not paths:
-                paths = [github_wallets_path()]
-            for path in paths:
-                parsed = _get_repo_file_json(path)
-                if parsed is None:
-                    continue
-                _absorb(parse_wallet_payload(parsed))
-            return addrs
-
-        # gist / raw URL fallback
-        raw_url = config.wallets_remote_url()
-        if mode == "gist" and gist_id() and github_token():
+        if mode == "repo" and github_token() and github_repo():
+            try:
+                cloud_wallets, _meta = _load_all_cloud_wallets_repo()
+                items = list(cloud_wallets or [])
+                source = "repo"
+            except Exception as exc:  # noqa: BLE001
+                err = str(exc)
+        elif mode == "gist" and gist_id() and github_token():
             try:
                 data = _request_json("GET", f"{GIST_API}/{gist_id()}")
                 files = data.get("files") or {}
@@ -1182,19 +1167,99 @@ def fetch_cloud_address_set() -> set[str]:
                         if content:
                             break
                 if content.strip():
-                    _absorb(parse_wallet_payload(json.loads(content)))
-            except Exception:  # noqa: BLE001
-                pass
-        elif raw_url:
-            try:
-                from .remote_wallets import fetch_wallets_from_url
+                    items = parse_wallet_payload(json.loads(content))
+                    source = "gist"
+            except Exception as exc:  # noqa: BLE001
+                err = str(exc)
 
-                _absorb(fetch_wallets_from_url(raw_url))
-            except Exception:  # noqa: BLE001
-                pass
-    except Exception:  # noqa: BLE001
-        return addrs
-    return addrs
+        # Public raw URL / index (works without token when URL is set)
+        if not items:
+            raw_url = config.wallets_remote_url()
+            if raw_url:
+                try:
+                    from .remote_wallets import fetch_wallets_from_url
+
+                    items = fetch_wallets_from_url(raw_url)
+                    source = "wallets_url"
+                    err = None
+                except Exception as exc:  # noqa: BLE001
+                    if not err:
+                        err = str(exc)
+
+        if not items and mode == "repo" and not github_token():
+            # Try public raw.githubusercontent.com index if repo is known
+            repo = github_repo()
+            branch = github_branch()
+            if repo:
+                try:
+                    from .remote_wallets import fetch_wallets_from_url
+
+                    index_path = config.cloud_index_path()
+                    public = (
+                        f"https://raw.githubusercontent.com/{repo}/{branch}/{index_path}"
+                    )
+                    items = fetch_wallets_from_url(public)
+                    source = "public_raw"
+                    err = None
+                except Exception as exc:  # noqa: BLE001
+                    if not err:
+                        err = str(exc)
+    except Exception as exc:  # noqa: BLE001
+        return {
+            "ok": False,
+            "source": source,
+            "error": str(exc),
+            "wallets": {},
+            "count": 0,
+            "count_after_score": 0,
+        }
+
+    by_addr: dict[str, dict[str, Any]] = {}
+    for it in items or []:
+        if not isinstance(it, dict):
+            continue
+        a = (it.get("address") or it.get("wallet") or "").strip()
+        if not a or len(a) < 32:
+            continue
+        try:
+            score = int(it.get("risk_score") if it.get("risk_score") is not None else it.get("score") or 0)
+        except (TypeError, ValueError):
+            score = 0
+        prev = by_addr.get(a)
+        if prev is None or score >= int(prev.get("risk_score") or 0):
+            by_addr[a] = {
+                "address": a,
+                "risk_score": score,
+                "label": it.get("label"),
+                "notes": it.get("notes") or "",
+                "source": it.get("source") or source,
+                "times_seen": int(it.get("times_seen") or 0),
+            }
+
+    filtered: dict[str, dict[str, Any]] = {}
+    for a, row in by_addr.items():
+        if int(row.get("risk_score") or 0) >= int(min_score or 0):
+            filtered[a] = row
+
+    return {
+        "ok": bool(by_addr) or (err is None and source != "none"),
+        "source": source,
+        "error": err if not by_addr else None,
+        "wallets": filtered,
+        "count": len(by_addr),
+        "count_after_score": len(filtered),
+    }
+
+
+def fetch_cloud_address_set() -> set[str]:
+    """
+    All wallet addresses currently in the cloud store (repo shards or gist).
+    Used to ignore upload of wallets that already exist in cloud even if local
+    DB was wiped (free Render) or is empty.
+    Returns empty set if cloud is off / unreachable (caller still checks local).
+    """
+    loaded = load_cloud_wallet_rows(min_score=0)
+    return set((loaded.get("wallets") or {}).keys())
 
 
 def fetch_cloud_wallet_count() -> dict[str, Any]:

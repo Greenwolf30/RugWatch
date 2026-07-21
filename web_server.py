@@ -638,12 +638,29 @@ class RugWatchHandler(BaseHTTPRequestHandler):
                     "off",
                 }
 
+            known_source = str(body.get("known_source") or "cloud").strip().lower()
+            if known_source not in {"cloud", "local", "both"}:
+                known_source = "cloud"
+
             result = monitor_once(
                 db,
                 limit=limit,
                 min_score=min_score,
                 only_new=only_new,
+                known_source=known_source,
             )
+            if not result.get("ok"):
+                self._json(
+                    400,
+                    {
+                        "ok": False,
+                        "error": result.get("error") or "Monitor failed",
+                        "known_source": result.get("known_source"),
+                        "cloud_source": result.get("cloud_source"),
+                        "known_wallets": result.get("known_wallets") or 0,
+                    },
+                )
+                return
             with _monitor_lock:
                 _monitor_last_ok_at = time.time()
             safe = {
@@ -656,6 +673,9 @@ class RugWatchHandler(BaseHTTPRequestHandler):
                 "only_new": result.get("only_new"),
                 "shortfall": result.get("shortfall"),
                 "known_wallets": result.get("known_wallets"),
+                "known_source": result.get("known_source"),
+                "cloud_source": result.get("cloud_source"),
+                "cloud_wallet_count": result.get("cloud_wallet_count"),
                 "alert_count": result.get("alert_count"),
                 "alerts": sanitize_public(result.get("alerts") or [])[:50],
                 "mints": sanitize_public(result.get("mints") or []),
