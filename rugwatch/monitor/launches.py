@@ -110,26 +110,75 @@ def monitor_once(
     limit: int = 25,
     min_score: int = 40,
     resolve_creator: bool = True,
+    only_new: bool = True,
+    pool_size: int | None = None,
 ) -> dict[str, Any]:
-    """Single poll of recent launches → check DB → alerts."""
+    """
+    Single poll of recent launches → check DB → alerts.
+
+    only_new=True (default): only process mints not yet in seen_mints, aiming for
+    up to `limit` brand-new launches per click (newest DexScreener first).
+    If fewer than `limit` never-seen mints are available in the current pool,
+    processes all that are available and reports shortfall in the result.
+    """
     db = db or RugWatchDB()
     known = db.known_wallet_set(min_score=min_score)
-    launches = pumpfun.fetch_recent_launches(limit=limit)
+    already = db.known_mint_set() if only_new else set()
+
+    # Wider Dex pool so we can fill `limit` never-seen mints when possible
+    fetch_n = int(pool_size) if pool_size and pool_size > 0 else max(limit * 4, 100)
+    candidates = pumpfun.fetch_recent_launches(limit=fetch_n)
+
+    skipped_seen = 0
+    launches: list[dict[str, Any]] = []
+    for launch in candidates:
+        mint = (launch.get("mint") or "").strip()
+        if not mint:
+            continue
+        if only_new and mint in already:
+            skipped_seen += 1
+            continue
+        launches.append(launch)
+        if len(launches) >= limit:
+            break
 
     all_alerts: list[dict[str, Any]] = []
+    mints_checked: list[str] = []
     for launch in launches:
+        mint = (launch.get("mint") or "").strip()
+        if mint:
+            mints_checked.append(mint)
         alerts = check_launch_against_db(
             launch, known, db=db, resolve_creator=resolve_creator
         )
         if alerts:
             all_alerts.extend(alerts)
 
+    shortfall = max(0, limit - len(launches)) if only_new else 0
+    note = None
+    if only_new and shortfall > 0:
+        note = (
+            f"Only {len(launches)} never-seen mint(s) in the current DexScreener pool "
+            f"(wanted {limit}; skipped {skipped_seen} already-seen). "
+            f"Try again after the cooldown when more new pairs appear."
+        )
+    elif only_new:
+        note = f"Checked {len(launches)} never-seen launch(es) (newest first)."
+
     return {
         "ok": True,
         "launches_scanned": len(launches),
+        "launches_target": limit,
+        "launches_new": len(launches) if only_new else None,
+        "skipped_already_seen": skipped_seen if only_new else 0,
+        "candidates_fetched": len(candidates),
+        "only_new": only_new,
         "known_wallets": len(known),
         "alerts": all_alerts,
         "alert_count": len(all_alerts),
+        "mints": mints_checked[:limit],
+        "shortfall": shortfall,
+        "note": note,
         "stats": db.stats(),
     }
 
@@ -139,6 +188,7 @@ def run_monitor_loop(
     interval: int | None = None,
     min_score: int = 40,
     limit: int = 25,
+    only_new: bool = True,
     on_tick: Callable[[dict[str, Any]], None] | None = None,
     max_ticks: int | None = None,
 ) -> None:
@@ -146,14 +196,21 @@ def run_monitor_loop(
     db = RugWatchDB()
     interval = interval or poll_seconds()
     tick = 0
-    print(f"RugWatch monitor started · every {interval}s · min_score={min_score}")
+    print(
+        f"RugWatch monitor started · every {interval}s · min_score={min_score} "
+        f"· only_new={only_new} · limit={limit}"
+    )
     print(f"DB: {db.path}")
     try:
         while True:
             tick += 1
             try:
                 result = monitor_once(
-                    db, limit=limit, min_score=min_score, resolve_creator=True
+                    db,
+                    limit=limit,
+                    min_score=min_score,
+                    resolve_creator=True,
+                    only_new=only_new,
                 )
             except Exception as exc:  # noqa: BLE001
                 result = {"ok": False, "error": str(exc), "alerts": []}
@@ -163,8 +220,12 @@ def run_monitor_loop(
                 ac = result.get("alert_count") or len(result.get("alerts") or [])
                 print(
                     f"[{tick}] scanned={result.get('launches_scanned')} "
+                    f"new_target={result.get('launches_target')} "
+                    f"skipped_seen={result.get('skipped_already_seen')} "
                     f"known={result.get('known_wallets')} alerts={ac}"
                 )
+                if result.get("note"):
+                    print(f"  note: {result.get('note')}")
                 for a in result.get("alerts") or []:
                     print("  ALERT:", a.get("message"))
             if max_ticks is not None and tick >= max_ticks:

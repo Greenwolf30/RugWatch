@@ -560,6 +560,33 @@ class RugWatchDB:
 
     # ── seen mints ─────────────────────────────────────────────────────
 
+    def is_mint_seen(self, mint: str) -> bool:
+        """True if mint is already in seen_mints (any local primary DB)."""
+        mint = (mint or "").strip()
+        if not mint:
+            return False
+        try:
+            with self.connect(self.path) as conn:
+                row = conn.execute(
+                    "SELECT 1 FROM seen_mints WHERE mint = ?", (mint,)
+                ).fetchone()
+                return row is not None
+        except sqlite3.Error:
+            return False
+
+    def known_mint_set(self) -> set[str]:
+        """All mints already recorded in seen_mints."""
+        out: set[str] = set()
+        try:
+            with self.connect(self.path) as conn:
+                for row in conn.execute("SELECT mint FROM seen_mints"):
+                    m = (row[0] or "").strip()
+                    if m:
+                        out.add(m)
+        except sqlite3.Error:
+            pass
+        return out
+
     def mark_mint_seen(
         self,
         mint: str,

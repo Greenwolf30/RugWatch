@@ -14,6 +14,7 @@ from server-side .env and are never sent to the browser.
   POST /api/upload       JSON: {"text": "..."} or {"wallets":[...]}  (import)
   POST /api/scan         JSON: {"mint":"...","deep":true?}
   POST /api/monitor      JSON: {} optional
+                         Scans up to 25 never-seen launches; 5-min cooldown
   POST /api/push-cloud   JSON: {}
   POST /api/pull-cloud   JSON: {}
   POST /api/unflag       JSON: {"addresses":[...], "push_cloud": true}
@@ -34,11 +35,18 @@ import json
 import os
 import re
 import sys
+import threading
+import time
 import traceback
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any
 from urllib.parse import parse_qs, urlparse
+
+# Website Monitor once: min seconds between successful /api/monitor runs
+MONITOR_COOLDOWN_SEC = 5 * 60
+_monitor_lock = threading.Lock()
+_monitor_last_ok_at: float = 0.0
 
 ROOT = Path(__file__).resolve().parent
 if str(ROOT) not in sys.path:
@@ -590,13 +598,70 @@ class RugWatchHandler(BaseHTTPRequestHandler):
         if path == "/api/monitor":
             from rugwatch.monitor.launches import monitor_once
 
-            result = monitor_once(db, limit=int(body.get("limit") or 25), min_score=int(body.get("min_score") or 40))
+            global _monitor_last_ok_at
+            now = time.time()
+            with _monitor_lock:
+                elapsed = now - _monitor_last_ok_at
+                if _monitor_last_ok_at > 0 and elapsed < MONITOR_COOLDOWN_SEC:
+                    wait = int(MONITOR_COOLDOWN_SEC - elapsed) + 1
+                    self._json(
+                        429,
+                        {
+                            "ok": False,
+                            "error": (
+                                f"Monitor cooldown: wait {wait}s "
+                                f"({MONITOR_COOLDOWN_SEC // 60} min between runs)."
+                            ),
+                            "cooldown_seconds": MONITOR_COOLDOWN_SEC,
+                            "retry_after_seconds": wait,
+                        },
+                    )
+                    return
+
+            try:
+                limit = int(body.get("limit") or 25)
+            except (TypeError, ValueError):
+                limit = 25
+            limit = max(1, min(limit, 40))
+            try:
+                min_score = int(body.get("min_score") or 40)
+            except (TypeError, ValueError):
+                min_score = 40
+            only_new = body.get("only_new")
+            if only_new is None:
+                only_new = True
+            else:
+                only_new = bool(only_new) and str(only_new).strip().lower() not in {
+                    "0",
+                    "false",
+                    "no",
+                    "off",
+                }
+
+            result = monitor_once(
+                db,
+                limit=limit,
+                min_score=min_score,
+                only_new=only_new,
+            )
+            with _monitor_lock:
+                _monitor_last_ok_at = time.time()
             safe = {
                 "ok": True,
                 "launches_scanned": result.get("launches_scanned"),
+                "launches_target": result.get("launches_target"),
+                "launches_new": result.get("launches_new"),
+                "skipped_already_seen": result.get("skipped_already_seen"),
+                "candidates_fetched": result.get("candidates_fetched"),
+                "only_new": result.get("only_new"),
+                "shortfall": result.get("shortfall"),
                 "known_wallets": result.get("known_wallets"),
                 "alert_count": result.get("alert_count"),
                 "alerts": sanitize_public(result.get("alerts") or [])[:50],
+                "mints": sanitize_public(result.get("mints") or []),
+                "note": result.get("note"),
+                "cooldown_seconds": MONITOR_COOLDOWN_SEC,
+                "retry_after_seconds": MONITOR_COOLDOWN_SEC,
             }
             self._json(200, safe)
             return

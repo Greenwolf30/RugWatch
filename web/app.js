@@ -66,7 +66,12 @@
       cache: "no-store",
     });
     const data = await r.json().catch(() => ({}));
-    if (!r.ok) throw new Error(data.error || r.statusText || "request failed");
+    if (!r.ok) {
+      const err = new Error(data.error || r.statusText || "request failed");
+      err.status = r.status;
+      err.data = data;
+      throw err;
+    }
     return data;
   }
 
@@ -262,24 +267,103 @@
     }
   }
 
+  const MONITOR_COOLDOWN_MS = 5 * 60 * 1000;
+  let _monitorCooldownUntil = 0;
+  let _monitorCooldownTimer = null;
+
+  function formatCooldown(ms) {
+    const s = Math.max(0, Math.ceil(ms / 1000));
+    const m = Math.floor(s / 60);
+    const r = s % 60;
+    return m + ":" + String(r).padStart(2, "0");
+  }
+
+  function updateMonitorButton() {
+    const btn = $("btnMonitor");
+    if (!btn) return;
+    const left = _monitorCooldownUntil - Date.now();
+    if (left > 0) {
+      btn.disabled = true;
+      btn.textContent = "Monitor once (" + formatCooldown(left) + ")";
+      btn.title =
+        "5 min cooldown — next run checks up to 25 never-seen launches";
+    } else {
+      btn.disabled = false;
+      btn.textContent = "Monitor once";
+      btn.title =
+        "Scan up to 25 never-seen launches (DexScreener). 5 min cooldown after each run.";
+      if (_monitorCooldownTimer) {
+        clearInterval(_monitorCooldownTimer);
+        _monitorCooldownTimer = null;
+      }
+    }
+  }
+
+  function startMonitorCooldown(ms) {
+    const wait = ms != null && Number.isFinite(Number(ms)) ? Number(ms) : MONITOR_COOLDOWN_MS;
+    _monitorCooldownUntil = Date.now() + Math.max(1000, wait);
+    updateMonitorButton();
+    if (_monitorCooldownTimer) clearInterval(_monitorCooldownTimer);
+    _monitorCooldownTimer = setInterval(updateMonitorButton, 1000);
+  }
+
   async function doMonitor() {
-    log("Polling recent launches…");
+    if (Date.now() < _monitorCooldownUntil) {
+      const left = _monitorCooldownUntil - Date.now();
+      alert("Monitor cooldown: wait " + formatCooldown(left) + " before the next run.");
+      return;
+    }
+    const btn = $("btnMonitor");
+    if (btn) {
+      btn.disabled = true;
+      btn.textContent = "Monitoring…";
+    }
+    log("Monitor: fetching up to 25 never-seen launches (newest first)…");
     try {
-      const data = await apiPost("/api/monitor", {});
+      const data = await apiPost("/api/monitor", {
+        limit: 25,
+        only_new: true,
+      });
       log(
-        "Monitor · scanned=" +
+        "Monitor · new_scanned=" +
           (data.launches_scanned ?? "") +
-          " known=" +
+          "/" +
+          (data.launches_target ?? 25) +
+          " skipped_seen=" +
+          (data.skipped_already_seen ?? "") +
+          " pool=" +
+          (data.candidates_fetched ?? "") +
+          " known_wallets=" +
           (data.known_wallets ?? "") +
           " alerts=" +
           (data.alert_count ?? 0)
       );
+      if (data.note) log("  " + data.note);
       (data.alerts || []).forEach((a) => log("  ALERT: " + (a.message || "")));
       if (data.alert_count) switchTab("alerts");
+      const cdSec =
+        data.retry_after_seconds != null
+          ? Number(data.retry_after_seconds)
+          : data.cooldown_seconds != null
+            ? Number(data.cooldown_seconds)
+            : 300;
+      startMonitorCooldown(cdSec * 1000);
       await refreshAll();
     } catch (e) {
-      log("ERROR: " + e.message);
-      alert(e.message);
+      const msg = String(e.message || e);
+      log("ERROR: " + msg);
+      const retry =
+        e.data && e.data.retry_after_seconds != null
+          ? Number(e.data.retry_after_seconds)
+          : null;
+      if (retry != null && Number.isFinite(retry)) {
+        startMonitorCooldown(retry * 1000);
+      } else {
+        const m = msg.match(/wait\s+(\d+)\s*s/i);
+        if (m) startMonitorCooldown(parseInt(m[1], 10) * 1000);
+        else updateMonitorButton();
+      }
+      alert(msg);
     }
   }
 
@@ -493,6 +577,7 @@
     });
     $("btnScan").addEventListener("click", () => doScan());
     $("btnMonitor").addEventListener("click", () => doMonitor());
+    updateMonitorButton();
     $("btnRefresh").addEventListener("click", () => {
       refreshAll();
       log("Refreshed.");

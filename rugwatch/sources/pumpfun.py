@@ -15,7 +15,7 @@ PUMP_COIN_ALT = "https://frontend-api-v3.pump.fun/coins"
 
 
 def fetch_pumpfun_pairs(limit: int = 40) -> list[dict[str, Any]]:
-    """Recent pump.fun / pumpswap pairs via DexScreener search."""
+    """Recent pump.fun / pumpswap pairs via DexScreener search (newest first)."""
     pairs: list[dict[str, Any]] = []
     for q in ("pump.fun", "pumpswap"):
         try:
@@ -29,19 +29,36 @@ def fetch_pumpfun_pairs(limit: int = 40) -> list[dict[str, Any]]:
             if chain not in {"solana", "sol"}:
                 continue
             pairs.append(p)
-    # de-dupe by pairAddress / base token
-    seen: set[str] = set()
-    out: list[dict[str, Any]] = []
+    # de-dupe by base mint; keep highest pairCreatedAt when duplicate
+    by_mint: dict[str, dict[str, Any]] = {}
     for p in pairs:
-        base = (p.get("baseToken") or {})
-        mint = base.get("address") or p.get("pairAddress") or ""
-        if not mint or mint in seen:
+        base = p.get("baseToken") or {}
+        mint = (base.get("address") or "").strip()
+        if not mint:
             continue
-        seen.add(mint)
-        out.append(p)
-        if len(out) >= limit:
-            break
-    return out
+        created = p.get("pairCreatedAt") or 0
+        try:
+            created_i = int(created)
+        except (TypeError, ValueError):
+            created_i = 0
+        prev = by_mint.get(mint)
+        if prev is None:
+            by_mint[mint] = p
+            continue
+        prev_c = prev.get("pairCreatedAt") or 0
+        try:
+            prev_i = int(prev_c)
+        except (TypeError, ValueError):
+            prev_i = 0
+        if created_i >= prev_i:
+            by_mint[mint] = p
+    # Newest pairs first so "new launch" scans prefer fresh mints
+    ranked = sorted(
+        by_mint.values(),
+        key=lambda p: int(p.get("pairCreatedAt") or 0),
+        reverse=True,
+    )
+    return ranked[: max(1, limit)]
 
 
 def pair_to_launch(p: dict[str, Any]) -> dict[str, Any]:
@@ -63,9 +80,12 @@ def pair_to_launch(p: dict[str, Any]) -> dict[str, Any]:
 
 
 def fetch_recent_launches(limit: int = 30) -> list[dict[str, Any]]:
-    pairs = fetch_pumpfun_pairs(limit=limit * 2)
+    """Up to `limit` recent Solana pump-related launches (newest first)."""
+    # Pull a wider pool then slice — search APIs return a mixed set
+    pairs = fetch_pumpfun_pairs(limit=max(limit * 3, limit, 80))
     launches = [pair_to_launch(p) for p in pairs]
     launches = [x for x in launches if x.get("mint")]
+    # Already newest-first from fetch_pumpfun_pairs
     return launches[:limit]
 
 
