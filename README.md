@@ -10,7 +10,8 @@ Not financial advice. Heuristics only — false positives happen.
 
 1. **Scan a mint** (token address) and review suggested wallets.  
 2. **Store** wallets, incidents, links, and alerts in a local database.  
-3. **Monitor** new launches against your wallet list.  
+3. **Monitor** up to **25 never-seen** launches per run against your wallet list  
+   (website **Monitor once** has a **5‑minute cooldown**).  
 4. **Push cloud** to keep an online list for Actual Token Checker.
 
 ---
@@ -63,10 +64,11 @@ python -m rugwatch list-wallets --min-score 40
 # Manually add a wallet
 python -m rugwatch add-wallet <WALLET> --score 80 --label serial --notes "from telegram"
 
-# One-shot launch check
+# One-shot launch check (up to 25 never-seen mints, newest first)
 python -m rugwatch monitor --once
 
-# Continuous monitor (Ctrl+C to stop)
+# Continuous monitor (same only-new logic; Ctrl+C to stop)
+# Interval: RUGWATCH_POLL_SECONDS (default 45)
 python -m rugwatch monitor
 python run_monitor.py
 
@@ -84,7 +86,8 @@ python desktop_app.py
 ```
 
 - Paste a **mint** → **Scan mint**  
-- **Monitor once** → check latest launches  
+- **Monitor once** → up to **25 never-seen** launches vs score ≥ 40  
+  (website: **5 min cooldown** between clicks)  
 - **Add wallet** manually  
 - Tabs: Log · Wallets · Alerts  
 
@@ -96,7 +99,7 @@ python desktop_app.py
 2. **Add wallet** only for ones you choose (or import/pull remote JSON).  
 3. Optional: set `RUGWATCH_AUTO_FLAG=1` only if you want old auto-flag behavior.  
 
-3. Leave **monitor** running (or click Monitor once often).  
+3. Leave **monitor** running, or click **Monitor once** (website: once per 5 minutes).  
 4. If a known wallet shows up as creator/insider on a new launch → **alert**.
 
 ---
@@ -130,7 +133,9 @@ python desktop_app.py
 - Not a full chain indexer — **sampling + heuristics**.  
 - Free RPCs will rate-limit; **Helius** is strongly recommended for deep scans.  
 - Launch data sources change over time; creator resolve is best-effort.  
-- Risk labels are heuristics, not legal judgments.
+- Risk labels are heuristics, not legal judgments.  
+- **Monitor** hits DexScreener each poll (2 searches). Website enforces a **5 min** cooldown to reduce 429 risk.  
+- “25 new” is a **target**; if most pool mints were already seen, fewer than 25 may be checked.
 
 ---
 

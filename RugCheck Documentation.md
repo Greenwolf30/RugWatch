@@ -41,7 +41,7 @@ RugWatch is a **private serial-wallet watchlist** for Solana research. You build
 |------|------|----------------|
 | 1. Research | **Scan mint** | Looks up one token; **suggests** wallets (does not auto-save by default). |
 | 2. Save | **Add wallet** / **Upload manual wallets** | Writes addresses into **your** local DB (and can push cloud). |
-| 3. Watch | **Monitor once** | Checks ~25 **current** recent launches against wallets with score ≥ 40. |
+| 3. Watch | **Monitor once** | Checks up to **25 never-seen** launches (newest first) vs wallets with score ≥ 40. **Website: 5 min cooldown** between runs. |
 | 4. Investigate | **Alerts** | On a hit: full **mint**, **wallet**, symbol, Solscan + DexScreener links. |
 | 5. ATC | Separate app | Flags those wallets on Holders when they appear on a mint you analyze. |
 
@@ -224,39 +224,53 @@ Deep mode may need optional provider setup on the machine/server. Without it, de
 
 ### Monitor once
 
-**Purpose:** One pass over **recent pump-style launches**, then stop. Checks whether any wallet **already in your DB** (score ≥ **40** by default) reappears as **creator** / light insider.
+**Purpose:** One pass that aims for up to **25 brand-new launches** (mints not yet in `seen_mints`), then stop. Checks whether any wallet **already in your DB** (score ≥ **40** by default) reappears as **creator** / light insider.
 
-**When to use:** After you have saved wallets; click regularly (or use continuous CLI monitor). Empty Alerts until you both have a list **and** a hit.
+**When to use:** After you have saved wallets. On the **website**, wait for the **5‑minute cooldown** between clicks (button shows a countdown). Empty Alerts until you both have a list **and** a hit.
 
 **What happens step by step:**
 
-1. Loads **known** wallets from local DB with score ≥ 40 → that number is `known=…`.  
-2. Fetches up to **~25 current recent** launches (DexScreener-style pump search) → `scanned=…`.  
-   - This is **not** “25 more never-seen launches.” Next click checks the **latest** 25 again (overlap is normal).  
-3. For each launch, resolves **creator** (and light rugcheck on mints not seen before).  
-4. If creator/insider is in your known set → **Alert** with full mint, wallet, symbol, explorer links → `alerts=…`.  
-5. If `alerts > 0`, app switches to the **Alerts** tab.  
-6. Stops (GUI does not loop; CLI `monitor` can run continuously).
+1. Loads **known** wallets from local DB with score ≥ 40 → `known_wallets=…`.  
+2. Fetches a **wide pool** of recent pump-style pairs from **DexScreener** (`pump.fun` + `pumpswap` searches), sorted **newest first**.  
+3. **Skips mints already in `seen_mints`** and keeps up to **25 never-seen** launches → `new_scanned` / `launches_scanned`.  
+   - If the pool has fewer than 25 never-seen mints, it processes all that are available and logs a **shortfall** note.  
+4. For each **new** launch: resolves **creator** (Pump.fun APIs) and runs light **Rugcheck** (new mints only).  
+5. If creator/insider is in your known set → **Alert** with full mint, wallet, symbol, explorer links → `alerts=…`.  
+6. If `alerts > 0`, app switches to the **Alerts** tab.  
+7. **Website only:** starts a **5‑minute cooldown** (server + UI). Next click before that returns **429** with remaining wait.  
+8. Stops (GUI does not loop; CLI `monitor` can run continuously with the same “only new” logic).
 
-**Log line example:**
+**Sources this run uses:**
+
+| Source | Role |
+|--------|------|
+| **DexScreener** | Discover recent Solana pump.fun / pumpswap pairs (2 search calls per poll) |
+| **Pump.fun front APIs** | Creator metadata (best-effort) |
+| **Rugcheck** | Creator + light insider holders — **new mints only** |
+| **Local DB** | Watchlist (score ≥ 40) + `seen_mints` skip list |
+
+**Log line example (website):**
 
 ```text
-Monitor · scanned=25 known=37 alerts=0
+Monitor · new_scanned=25/25 skipped_seen=40 pool=100 known_wallets=37 alerts=0
 ```
 
 | Field | Meaning |
 |-------|---------|
-| **scanned** | Launches checked this run (~25 current recent). |
-| **known** | Your watchlist size for this run (score ≥ 40). |
+| **new_scanned** / **launches_scanned** | Never-seen launches checked this run (target **25**). |
+| **skipped_seen** | Candidates already in `seen_mints` (not re-checked as “new”). |
+| **pool** | How many launches DexScreener returned before filtering. |
+| **known_wallets** | Your watchlist size for this run (score ≥ 40). |
 | **alerts** | Hits this run. **0** = none of your known wallets matched those launches. |
 
 **What Monitor does *not* do:**
 
 - Does not deep-scan every holder on every launch  
 - Does not auto-add new wallets to the DB (only alerts + activity on **already-known** wallets)  
-- Does not mean “found 25 ruggers” when `scanned=25`  
+- Does not mean “found 25 ruggers” when `new_scanned=25` — that is **25 new mints checked**  
+- Does not guarantee 25 new every time if DexScreener’s pool has already been mostly seen  
 
-Full detail also under [Monitor once — what the summary means](#monitor-once--what-the-summary-means) and [Alerts](#alerts).
+Full detail also under [Monitor once — summary line (detail)](#monitor-once--summary-line-detail) and [Alerts](#alerts).
 
 ---
 
@@ -501,19 +515,24 @@ The same multi-line block is also printed on the **Log** tab when Monitor fires 
 
 ## Monitor once — summary line (detail)
 
-When you click **Monitor once**, the Log prints something like:
+When you click **Monitor once** on the website, the Log prints something like:
 
 ```text
-Monitor · scanned=25 known=37 alerts=0
+Monitor · new_scanned=25/25 skipped_seen=40 pool=100 known_wallets=37 alerts=0
 ```
 
 This is the same Monitor behavior described under [Monitor once](#monitor-once). Quick reference:
 
 | Field | Meaning |
 |-------|---------|
-| **scanned** | ~**25 current** recent pump-style launches (re-fetched each click; not “25 more new ones”). |
-| **known** | Your watchlist size for this run (**score ≥ 40**). |
+| **new_scanned** / **launches_scanned** | Up to **25 never-seen** launches (newest first). Not a re-check of the same 25 every click. |
+| **skipped_seen** | Already in `seen_mints` — skipped this run. |
+| **pool** | Size of the DexScreener candidate set before filtering. |
+| **known_wallets** | Watchlist size for this run (**score ≥ 40**). |
 | **alerts** | Hits this run. **0** is normal if none of your wallets launched in that batch. |
+| **Cooldown (website)** | **5 minutes** after a successful run; button shows countdown; server rejects early clicks with **429**. |
+
+If fewer than 25 never-seen mints are available, the log note explains the shortfall — wait for the cooldown and try again when more new pairs appear.
 
 ---
 
@@ -535,7 +554,7 @@ Open **http://127.0.0.1:8787/**
 | Control | What it does |
 |---------|----------------|
 | Scan mint | Research one mint |
-| Monitor once | Check ~25 recent launches vs local DB |
+| Monitor once | Up to **25 never-seen** launches vs local DB; **5 min cooldown** after each run |
 | Refresh | Reload stats / wallets / alerts |
 | **Push cloud** | Local DB → your cloud wallet list |
 | **Pull cloud** | Cloud → merge into local DB |
@@ -586,8 +605,8 @@ Website and desktop share the **same** `data/rugwatch.db` when run from the same
 ### B. Watch for serial reuse on new launches
 
 1. Build a wallet list (workflow A).  
-2. Click **Monitor once** regularly (or run continuous CLI monitor).  
-3. Read Log summary: `scanned=… known=… alerts=…` (see above).  
+2. Click **Monitor once** (website: once every **5 minutes** — button counts down). Or run continuous CLI monitor.  
+3. Read Log summary: `new_scanned=…/25 skipped_seen=… known_wallets=… alerts=…` (see above).  
 4. If `alerts > 0` → **Alerts** tab (auto-selected) shows **token + full mint + wallet + links**.  
 5. Copy **Mint** into Actual Token Checker / open DexScreener or Solscan from the printed URLs.
 
@@ -668,7 +687,7 @@ What this does **not** do: share one multi-user police DB for everyone (cloud is
 |---|---|---|---|
 | Scan mint | Button | No by default (suggest only) | Yes |
 | Deep | Checkbox | No | Yes (if deep) |
-| Monitor once | Button | Alerts + activity on hits | Yes |
+| Monitor once | Button | Alerts + activity on hits; marks mints seen | Yes (DexScreener + Pump.fun + Rugcheck on new mints). Website: **5 min cooldown** |
 | Refresh | Button | No (re-reads UI) | Cloud pill may re-fetch count |
 | Clear DB | Button | Yes (deletes all local research) | No |
 | Export JSON | Button | No (reads → file) | No |
@@ -863,7 +882,7 @@ RugWatch does **not** import Actual Token Checker. ATC **reads** local SQLite an
 | Save one bad wallet | **Manual wallet** + score → **Add wallet** |
 | Save many wallets | **Upload manual wallets** (JSON/txt next to Add wallet) |
 | See my list | **Wallets** tab (or **Refresh**) |
-| Check new launches | **Monitor once** → read `scanned/known/alerts` → **Alerts** |
+| Check new launches | **Monitor once** → read `new_scanned/skipped_seen/alerts` → **Alerts** (website: 5 min cooldown) |
 | See which token alerted | **Alerts**: Token, full **Mint**, full **Wallet**, explorer links |
 | Reload UI only | **Refresh** (not a scan) |
 | Back up locally | **Export JSON** |
