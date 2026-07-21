@@ -268,6 +268,7 @@
   }
 
   const MONITOR_COOLDOWN_MS = 5 * 60 * 1000;
+  const MONITOR_CD_KEY = "rugwatch_monitor_cooldown_until";
   let _monitorCooldownUntil = 0;
   let _monitorCooldownTimer = null;
 
@@ -278,9 +279,39 @@
     return m + ":" + String(r).padStart(2, "0");
   }
 
+  function loadMonitorCooldownUntil() {
+    try {
+      const raw = localStorage.getItem(MONITOR_CD_KEY);
+      if (!raw) return 0;
+      const t = parseInt(raw, 10);
+      if (!Number.isFinite(t) || t <= Date.now()) {
+        localStorage.removeItem(MONITOR_CD_KEY);
+        return 0;
+      }
+      return t;
+    } catch (_) {
+      return 0;
+    }
+  }
+
+  function saveMonitorCooldownUntil(untilMs) {
+    try {
+      if (untilMs && untilMs > Date.now()) {
+        localStorage.setItem(MONITOR_CD_KEY, String(untilMs));
+      } else {
+        localStorage.removeItem(MONITOR_CD_KEY);
+      }
+    } catch (_) {
+      /* private mode / quota */
+    }
+  }
+
   function updateMonitorButton() {
     const btn = $("btnMonitor");
     if (!btn) return;
+    // Re-read storage in case another tab updated it
+    const stored = loadMonitorCooldownUntil();
+    if (stored > _monitorCooldownUntil) _monitorCooldownUntil = stored;
     const left = _monitorCooldownUntil - Date.now();
     if (left > 0) {
       btn.disabled = true;
@@ -288,10 +319,12 @@
       btn.title =
         "5 min cooldown — next run checks up to 25 never-seen launches";
     } else {
+      _monitorCooldownUntil = 0;
+      saveMonitorCooldownUntil(0);
       btn.disabled = false;
       btn.textContent = "Monitor once";
       btn.title =
-        "Scan up to 25 never-seen launches (DexScreener). 5 min cooldown after each run.";
+        "Scan up to 25 never-seen launches vs cloud list. 5 min cooldown after each run.";
       if (_monitorCooldownTimer) {
         clearInterval(_monitorCooldownTimer);
         _monitorCooldownTimer = null;
@@ -302,9 +335,21 @@
   function startMonitorCooldown(ms) {
     const wait = ms != null && Number.isFinite(Number(ms)) ? Number(ms) : MONITOR_COOLDOWN_MS;
     _monitorCooldownUntil = Date.now() + Math.max(1000, wait);
+    saveMonitorCooldownUntil(_monitorCooldownUntil);
     updateMonitorButton();
     if (_monitorCooldownTimer) clearInterval(_monitorCooldownTimer);
     _monitorCooldownTimer = setInterval(updateMonitorButton, 1000);
+  }
+
+  function restoreMonitorCooldown() {
+    _monitorCooldownUntil = loadMonitorCooldownUntil();
+    if (_monitorCooldownUntil > Date.now()) {
+      updateMonitorButton();
+      if (_monitorCooldownTimer) clearInterval(_monitorCooldownTimer);
+      _monitorCooldownTimer = setInterval(updateMonitorButton, 1000);
+    } else {
+      updateMonitorButton();
+    }
   }
 
   async function doMonitor() {
@@ -582,7 +627,7 @@
     });
     $("btnScan").addEventListener("click", () => doScan());
     $("btnMonitor").addEventListener("click", () => doMonitor());
-    updateMonitorButton();
+    restoreMonitorCooldown();
     $("btnRefresh").addEventListener("click", () => {
       refreshAll();
       log("Refreshed.");
