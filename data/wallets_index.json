@@ -4,11 +4,11 @@
   "shards": [
     {
       "path": "data/wallets_cloud.json",
-      "count": 167,
+      "count": 176,
       "shard": 1
     }
   ],
-  "total_count": 167,
-  "updated_at": "2026-07-21T18:27:25.552308+00:00",
+  "total_count": 176,
+  "updated_at": "2026-07-21T19:17:45.681614+00:00",
   "note": "Multi-shard wallet index. ATC/readers should load every path in shards[]. Each file is rugwatch_wallets_v1. Push merges local into cloud; cloud addresses are never removed."
 }
