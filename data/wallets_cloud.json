@@ -42,6 +42,30 @@
       "source": "adtc_ruggers_export"
     },
     {
+      "address": "2SemktmzUReA1VNK7kcu7ssWqpaBb9U5ixpg4RJcwfRo",
+      "chain_id": "solana",
+      "label": "ruggers_similar_sellers",
+      "risk_score": 80,
+      "notes": "ruggers similar_sellers \u00b7 $RACMAN \u00b7 mint 2V11cBstJRqY3KmpbEvusbYs6PbpfvdS8q2KuSiJpump \u00b7 100.0% sold of first bag \u00b7 sold_swing_bag",
+      "source": "adtc_ruggers_export"
+    },
+    {
+      "address": "2Unfs8cBSsiWWz34LSoWUqQqyWaoxjWMwamskKKBNMMH",
+      "chain_id": "solana",
+      "label": "ruggers_similar_sellers",
+      "risk_score": 80,
+      "notes": "ruggers similar_sellers \u00b7 $RACMAN \u00b7 mint 2V11cBstJRqY3KmpbEvusbYs6PbpfvdS8q2KuSiJpump \u00b7 100.0% sold of first bag \u00b7 not_listed",
+      "source": "adtc_ruggers_export"
+    },
+    {
+      "address": "2ZNRYoitMWvzK66Kj8xB8pHXmo2hywsvgwsxnLBQM1kk",
+      "chain_id": "solana",
+      "label": "ruggers_similar_sellers",
+      "risk_score": 80,
+      "notes": "ruggers similar_sellers \u00b7 $RACMAN \u00b7 mint 2V11cBstJRqY3KmpbEvusbYs6PbpfvdS8q2KuSiJpump \u00b7 100.0% sold of first bag \u00b7 not_listed",
+      "source": "adtc_ruggers_export"
+    },
+    {
       "address": "2bZe5WmEVV2DC7zpZbMxzuApGEqSvUNu3crvCL7pnpgL",
       "chain_id": "solana",
       "label": "ruggers_similar_sellers",
@@ -151,6 +175,14 @@
       "label": "ruggers_similar_sellers",
       "risk_score": 80,
       "notes": "ruggers similar_sellers \u00b7 $Tcat \u00b7 mint G7qNiBPUb9bJzK25oerm2XXkLXCm6wPEH7A9hjLqpump \u00b7 100.0% sold of first bag \u00b7 not_listed",
+      "source": "adtc_ruggers_export"
+    },
+    {
+      "address": "3ctfRhVisxBtykVALvb46wfYihExaMKyZMzjueW3S3Mx",
+      "chain_id": "solana",
+      "label": "ruggers_similar_sellers",
+      "risk_score": 80,
+      "notes": "ruggers similar_sellers \u00b7 $RACMAN \u00b7 mint 2V11cBstJRqY3KmpbEvusbYs6PbpfvdS8q2KuSiJpump \u00b7 100.0% sold of first bag \u00b7 not_listed",
       "source": "adtc_ruggers_export"
     },
     {
@@ -354,6 +386,14 @@
       "source": "adtc_ruggers_export"
     },
     {
+      "address": "5T5tz6iiL8DFsmu1rwEZ15coCkdbkqTd2UuUJ5nnFEzg",
+      "chain_id": "solana",
+      "label": "ruggers_similar_sellers",
+      "risk_score": 80,
+      "notes": "ruggers similar_sellers \u00b7 $RACMAN \u00b7 mint 2V11cBstJRqY3KmpbEvusbYs6PbpfvdS8q2KuSiJpump \u00b7 100.0% sold of first bag \u00b7 not_listed",
+      "source": "adtc_ruggers_export"
+    },
+    {
       "address": "5TqDvNJjjcNYRBSxziJBc1t8cyxgghCsSn8kSfuoCSAM",
       "chain_id": "solana",
       "label": "ruggers_similar_sellers",
@@ -471,6 +511,22 @@
       "label": "ruggers_single_sellers",
       "risk_score": 80,
       "notes": "ruggers single_sellers \u00b7 $TOPEDO \u00b7 mint 8gn2JDaZBvXHSVUebAhmqzPE4merWcT53owixPsbpump \u00b7 100.0% sold of first bag \u00b7 not_listed",
+      "source": "adtc_ruggers_export"
+    },
+    {
+      "address": "6hdJ5diU1ZQ5PQrwxh6AZ2cRNB9xvQguJft3EXcr6Yvd",
+      "chain_id": "solana",
+      "label": "ruggers_similar_sellers",
+      "risk_score": 80,
+      "notes": "ruggers similar_sellers \u00b7 $RACMAN \u00b7 mint 2V11cBstJRqY3KmpbEvusbYs6PbpfvdS8q2KuSiJpump \u00b7 100.0% sold of first bag \u00b7 not_listed",
+      "source": "adtc_ruggers_export"
+    },
+    {
+      "address": "6ikyXLbq4EtVoDsoFeZUc87qJsutAQ6Tae2TcP4CZzsP",
+      "chain_id": "solana",
+      "label": "ruggers_similar_sellers",
+      "risk_score": 80,
+      "notes": "ruggers similar_sellers \u00b7 $RACMAN \u00b7 mint 2V11cBstJRqY3KmpbEvusbYs6PbpfvdS8q2KuSiJpump \u00b7 100.0% sold of first bag \u00b7 not_listed",
       "source": "adtc_ruggers_export"
     },
     {
@@ -658,6 +714,14 @@
       "source": "adtc_ruggers_export"
     },
     {
+      "address": "817sJTw5LZRUzf4VqpWBB2Yh1fMU5gnjbdXztQLRNobf",
+      "chain_id": "solana",
+      "label": "ruggers_similar_sellers",
+      "risk_score": 80,
+      "notes": "ruggers similar_sellers \u00b7 $RACMAN \u00b7 mint 2V11cBstJRqY3KmpbEvusbYs6PbpfvdS8q2KuSiJpump \u00b7 100.0% sold of first bag \u00b7 sold_swing_bag",
+      "source": "adtc_ruggers_export"
+    },
+    {
       "address": "81VjycyjpMD2JSrVyRRVYHMJXtEcx9ptaXrFfAtyC5W9",
       "chain_id": "solana",
       "label": "ruggers_launch_window_sellers",
@@ -695,6 +759,14 @@
       "label": "ruggers_single_sellers",
       "risk_score": 80,
       "notes": "ruggers single_sellers \u00b7 $Shakira \u00b7 mint 4gbeSvVfCXY9Spzmf8t7rsfwdD4LxbqEqx5wvZXtpump \u00b7 100.0% sold of first bag \u00b7 not_listed",
+      "source": "adtc_ruggers_export"
+    },
+    {
+      "address": "8Cc3mwdJqDihDxbuZP84uGqLQkS6CE5DXvapyryopuD7",
+      "chain_id": "solana",
+      "label": "ruggers_similar_sellers",
+      "risk_score": 80,
+      "notes": "ruggers similar_sellers \u00b7 $RACMAN \u00b7 mint 2V11cBstJRqY3KmpbEvusbYs6PbpfvdS8q2KuSiJpump \u00b7 100.0% sold of first bag \u00b7 not_listed",
       "source": "adtc_ruggers_export"
     },
     {
@@ -866,11 +938,27 @@
       "source": "adtc_ruggers_export"
     },
     {
+      "address": "9mibQLuayr64Ly4PhRuZJCscyBumAp89qK2Xh3CoQgQK",
+      "chain_id": "solana",
+      "label": "ruggers_similar_sellers",
+      "risk_score": 80,
+      "notes": "ruggers similar_sellers \u00b7 $RACMAN \u00b7 mint 2V11cBstJRqY3KmpbEvusbYs6PbpfvdS8q2KuSiJpump \u00b7 100.0% sold of first bag \u00b7 not_listed",
+      "source": "adtc_ruggers_export"
+    },
+    {
       "address": "9oGsSvJXqUbRT1qnEgbPjsjJ334WvktSWKqF7sN5BXU",
       "chain_id": "solana",
       "label": "ruggers_single_sellers",
       "risk_score": 80,
       "notes": "ruggers single_sellers \u00b7 $Tcat \u00b7 mint G7qNiBPUb9bJzK25oerm2XXkLXCm6wPEH7A9hjLqpump \u00b7 100.0% sold of first bag \u00b7 not_listed",
+      "source": "adtc_ruggers_export"
+    },
+    {
+      "address": "9pgfRXneFESfaJhdSaqPy3jE8xuWxayTNTjAQbq8y5V7",
+      "chain_id": "solana",
+      "label": "ruggers_similar_sellers",
+      "risk_score": 80,
+      "notes": "ruggers similar_sellers \u00b7 $RACMAN \u00b7 mint 2V11cBstJRqY3KmpbEvusbYs6PbpfvdS8q2KuSiJpump \u00b7 100.0% sold of first bag \u00b7 not_listed",
       "source": "adtc_ruggers_export"
     },
     {
@@ -994,6 +1082,14 @@
       "source": "adtc_ruggers_export"
     },
     {
+      "address": "AkCvpgr9BwAUoMkgiV6RNZU2goM58Yb98dbw5LWTUL8u",
+      "chain_id": "solana",
+      "label": "ruggers_similar_sellers",
+      "risk_score": 80,
+      "notes": "ruggers similar_sellers \u00b7 $RACMAN \u00b7 mint 2V11cBstJRqY3KmpbEvusbYs6PbpfvdS8q2KuSiJpump \u00b7 100.0% sold of first bag \u00b7 not_listed",
+      "source": "adtc_ruggers_export"
+    },
+    {
       "address": "AkfrTjdMHK8Jxv8W8KtuzUuqLn5a9xigNbs9k5VFuWXK",
       "chain_id": "solana",
       "label": "ruggers_single_sellers",
@@ -1090,6 +1186,14 @@
       "source": "adtc_ruggers_export"
     },
     {
+      "address": "BAso1DAHKvD6QbwfDM8Nn61MhZC4a9Km3SK7oBpFvxrM",
+      "chain_id": "solana",
+      "label": "ruggers_similar_sellers",
+      "risk_score": 80,
+      "notes": "ruggers similar_sellers \u00b7 $RACMAN \u00b7 mint 2V11cBstJRqY3KmpbEvusbYs6PbpfvdS8q2KuSiJpump \u00b7 100.0% sold of first bag \u00b7 not_listed",
+      "source": "adtc_ruggers_export"
+    },
+    {
       "address": "BEQcyjDafrZvbyLP3XAxzztjjh27wkVDRzG7U6PdBpn8",
       "chain_id": "solana",
       "label": "ruggers_similar_sellers",
@@ -1119,6 +1223,14 @@
       "label": "ruggers_similar_sellers",
       "risk_score": 80,
       "notes": "ruggers similar_sellers \u00b7 $TOPEDO \u00b7 mint 8gn2JDaZBvXHSVUebAhmqzPE4merWcT53owixPsbpump \u00b7 100.0% sold of first bag \u00b7 not_listed",
+      "source": "adtc_ruggers_export"
+    },
+    {
+      "address": "BSfovHuP5xXeCwW1z7pVzZN5axHyVwvjd5dxqNoePYw5",
+      "chain_id": "solana",
+      "label": "ruggers_similar_sellers",
+      "risk_score": 80,
+      "notes": "ruggers similar_sellers \u00b7 $RACMAN \u00b7 mint 2V11cBstJRqY3KmpbEvusbYs6PbpfvdS8q2KuSiJpump \u00b7 100.0% sold of first bag \u00b7 not_listed",
       "source": "adtc_ruggers_export"
     },
     {
@@ -1226,6 +1338,14 @@
       "source": "adtc_ruggers_export"
     },
     {
+      "address": "CsfJZV3A697amo8ZtCrVEXhTTsw4DvG1oLJbGH1diktj",
+      "chain_id": "solana",
+      "label": "ruggers_similar_sellers",
+      "risk_score": 80,
+      "notes": "ruggers similar_sellers \u00b7 $RACMAN \u00b7 mint 2V11cBstJRqY3KmpbEvusbYs6PbpfvdS8q2KuSiJpump \u00b7 100.0% sold of first bag \u00b7 not_listed",
+      "source": "adtc_ruggers_export"
+    },
+    {
       "address": "CzYemH3xyJtgU6Y1ckNWV3kteaip8fWsDLj7yMfAnwYP",
       "chain_id": "solana",
       "label": "ruggers_similar_sellers",
@@ -1239,6 +1359,14 @@
       "label": "ruggers_single_sellers",
       "risk_score": 80,
       "notes": "ruggers single_sellers \u00b7 $Tcat \u00b7 mint G7qNiBPUb9bJzK25oerm2XXkLXCm6wPEH7A9hjLqpump \u00b7 100.0% sold of first bag \u00b7 not_listed",
+      "source": "adtc_ruggers_export"
+    },
+    {
+      "address": "D3Upw4V8mQmy3EtV2tgBY4BA4dguroNdLuVeAo7AWg1h",
+      "chain_id": "solana",
+      "label": "ruggers_similar_sellers",
+      "risk_score": 80,
+      "notes": "ruggers similar_sellers \u00b7 $RACMAN \u00b7 mint 2V11cBstJRqY3KmpbEvusbYs6PbpfvdS8q2KuSiJpump \u00b7 100.0% sold of first bag \u00b7 not_listed",
       "source": "adtc_ruggers_export"
     },
     {
@@ -1287,6 +1415,14 @@
       "label": "ruggers_similar_sellers",
       "risk_score": 80,
       "notes": "ruggers similar_sellers \u00b7 $CYBER \u00b7 mint 6uqistk4MbJicP1c8yudEfdJGSq9AtEpL8UAvT38pump \u00b7 100.0% sold of first bag \u00b7 not_listed",
+      "source": "adtc_ruggers_export"
+    },
+    {
+      "address": "DUVd4bfmKvwEhF8qTNikugXEARvp33U69bbaQiC59nVS",
+      "chain_id": "solana",
+      "label": "ruggers_similar_sellers",
+      "risk_score": 80,
+      "notes": "ruggers similar_sellers \u00b7 $RACMAN \u00b7 mint 2V11cBstJRqY3KmpbEvusbYs6PbpfvdS8q2KuSiJpump \u00b7 100.0% sold of first bag \u00b7 not_listed",
       "source": "adtc_ruggers_export"
     },
     {
@@ -1367,6 +1503,14 @@
       "label": "ruggers_single_sellers",
       "risk_score": 80,
       "notes": "ruggers single_sellers \u00b7 $CYBER \u00b7 mint 6uqistk4MbJicP1c8yudEfdJGSq9AtEpL8UAvT38pump \u00b7 100.0% sold of first bag \u00b7 not_listed",
+      "source": "adtc_ruggers_export"
+    },
+    {
+      "address": "EEFGcEEgxaoR8xuSdpq4oNNNyS87PkbqQKQTX89s8573",
+      "chain_id": "solana",
+      "label": "ruggers_similar_sellers",
+      "risk_score": 80,
+      "notes": "ruggers similar_sellers \u00b7 $RACMAN \u00b7 mint 2V11cBstJRqY3KmpbEvusbYs6PbpfvdS8q2KuSiJpump \u00b7 100.0% sold of first bag \u00b7 not_listed",
       "source": "adtc_ruggers_export"
     },
     {
@@ -1455,6 +1599,14 @@
       "label": "ruggers_launch_window_sellers",
       "risk_score": 80,
       "notes": "ruggers launch_window_sellers \u00b7 $SCOOBERT \u00b7 mint MPVe5KBa23gXyfGoxBpL9FoBhKci7M6XTVZVw1Vpump \u00b7 100.0% sold of first bag \u00b7 not_listed",
+      "source": "adtc_ruggers_export"
+    },
+    {
+      "address": "F7zKtC4qUP5PPpR5jATZCSGk3yeFbkqxe6UTEuyVpCKd",
+      "chain_id": "solana",
+      "label": "ruggers_similar_sellers",
+      "risk_score": 80,
+      "notes": "ruggers similar_sellers \u00b7 $RACMAN \u00b7 mint 2V11cBstJRqY3KmpbEvusbYs6PbpfvdS8q2KuSiJpump \u00b7 100.0% sold of first bag \u00b7 not_listed",
       "source": "adtc_ruggers_export"
     },
     {
@@ -1567,6 +1719,14 @@
       "label": "ruggers_single_sellers",
       "risk_score": 80,
       "notes": "ruggers single_sellers \u00b7 $Rebecca \u00b7 mint CPYdtkP4BBFXgFMPDuWRPjPVThiMYX5uJSSdTBkppump \u00b7 100.0% sold of first bag \u00b7 not_listed",
+      "source": "adtc_ruggers_export"
+    },
+    {
+      "address": "GEqjrkdcdKWX5nQf8gJeGcRRcRqGLEUXy1B1Pk5R51Ge",
+      "chain_id": "solana",
+      "label": "ruggers_similar_sellers",
+      "risk_score": 80,
+      "notes": "ruggers similar_sellers \u00b7 $RACMAN \u00b7 mint 2V11cBstJRqY3KmpbEvusbYs6PbpfvdS8q2KuSiJpump \u00b7 100.0% sold of first bag \u00b7 not_listed",
       "source": "adtc_ruggers_export"
     },
     {
@@ -1778,6 +1938,14 @@
       "source": "adtc_ruggers_export"
     },
     {
+      "address": "HpLVWzCbF37vUU27bc7BjWp6ErdMfKAUnXsYiYxL6USd",
+      "chain_id": "solana",
+      "label": "ruggers_similar_sellers",
+      "risk_score": 80,
+      "notes": "ruggers similar_sellers \u00b7 $RACMAN \u00b7 mint 2V11cBstJRqY3KmpbEvusbYs6PbpfvdS8q2KuSiJpump \u00b7 100.0% sold of first bag \u00b7 not_listed",
+      "source": "adtc_ruggers_export"
+    },
+    {
       "address": "HuucdRfVvYzb46tJCba9cPcUG5BZ14fhjtdedWgVYP2z",
       "chain_id": "solana",
       "label": "ruggers_single_sellers",
@@ -1890,6 +2058,14 @@
       "source": "adtc_ruggers_export"
     },
     {
+      "address": "mpzq9MghHAjBJaV6nMk99kBXamxmDCpZjNeH8koh2Mf",
+      "chain_id": "solana",
+      "label": "ruggers_similar_sellers",
+      "risk_score": 80,
+      "notes": "ruggers similar_sellers \u00b7 $RACMAN \u00b7 mint 2V11cBstJRqY3KmpbEvusbYs6PbpfvdS8q2KuSiJpump \u00b7 100.0% sold of first bag \u00b7 sold_swing_bag",
+      "source": "adtc_ruggers_export"
+    },
+    {
       "address": "n62QUDHwXWCnZyArC9KsP3PqeBzf7WwAMqRLtwUgR7z",
       "chain_id": "solana",
       "label": "ruggers_similar_sellers",
@@ -1906,6 +2082,14 @@
       "source": "adtc_ruggers_export"
     },
     {
+      "address": "zj4KDZtAMdtDVUPkqLpAr2icNxUCUDBXZdnzt5nJtbs",
+      "chain_id": "solana",
+      "label": "ruggers_similar_sellers",
+      "risk_score": 80,
+      "notes": "ruggers similar_sellers \u00b7 $RACMAN \u00b7 mint 2V11cBstJRqY3KmpbEvusbYs6PbpfvdS8q2KuSiJpump \u00b7 100.0% sold of first bag \u00b7 not_listed",
+      "source": "adtc_ruggers_export"
+    },
+    {
       "address": "zxLJ91mWrGBLywWfBRu775vU4SFCjBjUwi2xxGEyeVH",
       "chain_id": "solana",
       "label": "ruggers_single_sellers",
@@ -1914,7 +2098,7 @@
       "source": "adtc_ruggers_export"
     }
   ],
-  "count": 239,
+  "count": 262,
   "shard": 1,
   "total_shards": 1,
   "note": "RugWatch wallet list \u2014 cloud shard (same project on GitHub)"
