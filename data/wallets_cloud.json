@@ -2778,6 +2778,14 @@
       "source": "adtc_ruggers_export"
     },
     {
+      "address": "CxGAxQo1D2MQfj1cQFpUtTvxMV81Yek82eX38EiLPbBM",
+      "chain_id": "solana",
+      "label": "ruggers_creator_sellers",
+      "risk_score": 80,
+      "notes": "ruggers creator_sellers \u00b7 $Jimothy \u00b7 mint 9zoHCQgyPQFVkNxbF686XD4aENRMhMmkDutLuugFpump \u00b7 100.0% sold of first bag \u00b7 sold_100",
+      "source": "adtc_ruggers_export"
+    },
+    {
       "address": "CypkAw27DaRFc2dGct3twNRTjnZe5kWS3uaK8rmsYMoQ",
       "chain_id": "solana",
       "label": "ruggers_similar_sized_sellers",
@@ -4178,7 +4186,7 @@
       "source": "adtc_ruggers_export"
     }
   ],
-  "count": 522,
+  "count": 523,
   "shard": 1,
   "total_shards": 1,
   "note": "RugWatch wallet list \u2014 cloud shard (same project on GitHub)"
