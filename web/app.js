@@ -238,14 +238,20 @@
         mint: mint,
         deep: !!$("deepScan").checked,
       });
+      const cloudRows = Array.isArray(data.cloud_wallets)
+        ? data.cloud_wallets
+        : [];
+      const cloudList = Array.isArray(data.cloud_wallets_list)
+        ? data.cloud_wallets_list
+        : cloudRows
+            .map((c) => (c && (c.wallet || c.address)) || "")
+            .filter(Boolean);
       const nCloud =
         data.cloud_wallets_found != null
           ? Number(data.cloud_wallets_found)
           : data.cloud_wallets_count != null
             ? Number(data.cloud_wallets_count)
-            : Array.isArray(data.cloud_wallets)
-              ? data.cloud_wallets.length
-              : 0;
+            : cloudList.length;
       const cloudMsg =
         data.cloud_found_message ||
         (nCloud === 0
@@ -259,24 +265,50 @@
           (data.symbol || "") +
           " · type=" +
           (data.incident_type || "") +
-          " · flagged=" +
-          ((data.wallets_flagged || []).length || 0) +
-          " · " +
-          cloudMsg
+          " · scan_flagged=" +
+          ((data.wallets_flagged || []).length || 0)
       );
-      log("  Cloud: " + cloudMsg);
-      if (nCloud > 0 && Array.isArray(data.cloud_wallets)) {
-        data.cloud_wallets.forEach((c) => {
-          log(
-            "  [cloud] " +
-              (c.role || "") +
-              ": " +
-              (c.wallet || c.address || "")
-          );
-        });
+      log("══════════════════════════════════════");
+      log("CLOUD MATCHES: " + cloudMsg);
+      log(
+        "  holders checked=" +
+          (data.holders_checked != null ? data.holders_checked : "?") +
+          " · cloud list size=" +
+          (data.cloud_list_size != null ? data.cloud_list_size : "?") +
+          " · cloud checked=" +
+          (data.cloud_checked === true ? "yes" : "no")
+      );
+      if (nCloud <= 0) {
+        log("  0 wallets found from cloud");
       } else {
-        log("  [cloud] 0 wallets found");
+        log("  Full list (" + nCloud + "):");
+        // Prefer full structured rows; fall back to plain address list
+        if (cloudRows.length) {
+          cloudRows.forEach((c, i) => {
+            const addr = (c && (c.wallet || c.address)) || "";
+            const bits = [
+              String(i + 1).padStart(3, " ") + ".",
+              addr,
+              c && c.role ? "(" + c.role + ")" : "",
+              c && c.label ? "[" + c.label + "]" : "",
+              c && c.risk_score != null ? "score=" + c.risk_score : "",
+            ].filter(Boolean);
+            log("  " + bits.join(" "));
+          });
+        } else {
+          cloudList.forEach((addr, i) => {
+            log("  " + String(i + 1).padStart(3, " ") + ". " + addr);
+          });
+        }
+        if (data.cloud_wallets_text) {
+          log("  ── pasteable addresses ──");
+          String(data.cloud_wallets_text)
+            .split(/\r?\n/)
+            .filter(Boolean)
+            .forEach((line) => log("  " + line));
+        }
       }
+      log("══════════════════════════════════════");
       (data.wallets_flagged || []).forEach((f) => {
         log(
           "  [" +

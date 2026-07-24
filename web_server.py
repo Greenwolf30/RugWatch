@@ -639,6 +639,30 @@ class RugWatchHandler(BaseHTTPRequestHandler):
                 if n_cloud == 0
                 else f"{n_cloud} wallets found from cloud"
             )
+            # Full cloud match list — do not use list[:500] sanitize cap
+            raw_cloud = result.get("cloud_wallets") or []
+            if not isinstance(raw_cloud, list):
+                raw_cloud = []
+            cloud_rows = []
+            for item in raw_cloud[:20_000]:
+                if isinstance(item, dict):
+                    cloud_rows.append(
+                        {
+                            "wallet": item.get("wallet") or item.get("address"),
+                            "address": item.get("address") or item.get("wallet"),
+                            "role": item.get("role"),
+                            "label": item.get("label"),
+                            "risk_score": item.get("risk_score"),
+                            "notes": item.get("notes"),
+                            "on_cloud": True,
+                        }
+                    )
+            cloud_list = result.get("cloud_wallets_list") or [
+                r.get("wallet") for r in cloud_rows if r.get("wallet")
+            ]
+            cloud_text = result.get("cloud_wallets_text") or "\n".join(
+                str(a) for a in cloud_list if a
+            )
             safe = {
                 "ok": True,
                 "mint": result.get("mint") or mint,
@@ -648,11 +672,13 @@ class RugWatchHandler(BaseHTTPRequestHandler):
                 "auto_flag": result.get("auto_flag"),
                 "note": result.get("note"),
                 "wallets_flagged": sanitize_public(result.get("wallets_flagged") or []),
-                # Cloud list hits on this mint (always include count, 0 if none)
+                # Full cloud list + count (0 wallets found if none)
                 "cloud_wallets_found": n_cloud,
                 "cloud_wallets_count": n_cloud,
                 "cloud_found_message": cloud_msg,
-                "cloud_wallets": sanitize_public(result.get("cloud_wallets") or []),
+                "cloud_wallets": cloud_rows,
+                "cloud_wallets_list": list(cloud_list)[:20_000],
+                "cloud_wallets_text": str(cloud_text or ""),
                 "cloud_checked": bool(result.get("cloud_checked")),
                 "cloud_list_size": result.get("cloud_list_size"),
                 "holders_checked": result.get("holders_checked"),

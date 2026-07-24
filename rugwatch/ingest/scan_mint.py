@@ -254,21 +254,22 @@ def scan_and_ingest_mint(
         meta={"incident_type": incident_type},
     )
 
-    # ── Cloud list matches on this mint ───────────────────────────────
-    # How many wallets seen on this scan are already on the GitHub cloud list
-    # (or local DB after Pull cloud). Always report a number, including 0.
+    # ── Cloud list matches on this mint (full list + count) ───────────
+    # Match every holder/creator we can see against the GitHub cloud list.
+    # Always report count (including 0) and the complete matched address list.
     cloud_matches: list[dict[str, Any]] = []
     cloud_checked = False
     cloud_set: set[str] = set()
     try:
         from ..cloud_store import fetch_cloud_address_set
 
-        cloud_set = fetch_cloud_address_set() or set()
+        raw_cloud = fetch_cloud_address_set() or set()
+        # Normalize case for Solana base58 (usually mixed; compare exact + as stored)
+        cloud_set = {str(a).strip() for a in raw_cloud if a and str(a).strip()}
         cloud_checked = True
     except Exception as exc:  # noqa: BLE001
         report["errors"].append(f"cloud_match: {exc}")
         cloud_set = set()
-        # Fallback: local DB addresses (often hydrated from cloud on boot)
         try:
             for row in db.list_wallets(min_score=0, limit=200_000) or []:
                 a = (row.get("address") or row.get("wallet") or "").strip()
@@ -278,6 +279,9 @@ def scan_and_ingest_mint(
                 cloud_checked = True
         except Exception:  # noqa: BLE001
             pass
+
+    # Build cloud lookup that is case-sensitive first (Solana addresses are case-sensitive)
+    cloud_lookup = set(cloud_set)
 
     seen_on_mint: dict[str, str] = {}  # addr → role/source hint
     if creator:
@@ -290,35 +294,93 @@ def scan_and_ingest_mint(
             continue
         role = "insider" if h.get("insider") else "holder"
         seen_on_mint.setdefault(wa, role)
+    # Solscan: pull more holders when possible
+    sc_full = solscan.fetch_holders(mint, limit=50)
+    if sc_full.get("ok"):
+        report["sources"]["solscan_cloud_match"] = {
+            "ok": True,
+            "count": len(sc_full.get("holders") or []),
+        }
+        for h in sc_full.get("holders") or []:
+            wa = (h.get("wallet") or h.get("address") or "").strip()
+            if wa and len(wa) >= 32:
+                seen_on_mint.setdefault(wa, "holder")
     if sc.get("ok"):
         for h in sc.get("holders") or []:
             wa = (h.get("wallet") or h.get("address") or "").strip()
             if wa and len(wa) >= 32:
                 seen_on_mint.setdefault(wa, "holder")
+    # RPC top holders (up to 20 largest token accounts)
+    if config.solana_rpc_url():
+        try:
+            rpc_holders = sol_rpc.top_holders(mint, limit=20)
+            report["sources"]["rpc_holders"] = {"count": len(rpc_holders)}
+            for h in rpc_holders:
+                wa = (h.get("wallet") or h.get("owner") or "").strip()
+                if wa and len(wa) >= 32:
+                    seen_on_mint.setdefault(wa, "holder")
+        except Exception as exc:  # noqa: BLE001
+            report["sources"]["rpc_holders"] = {"ok": False, "error": str(exc)}
     for f in flagged:
         wa = (f.get("wallet") or "").strip()
         if wa:
             seen_on_mint.setdefault(wa, f.get("role") or "scan")
 
-    for wa, role in seen_on_mint.items():
+    # Local DB rows already linked to this mint (from prior imports / pulls)
+    try:
+        if hasattr(db, "wallets_for_mint"):
+            for row in db.wallets_for_mint(mint) or []:
+                wa = (row.get("address") or row.get("wallet") or "").strip()
+                if wa:
+                    seen_on_mint.setdefault(wa, row.get("role") or "linked")
+    except Exception:  # noqa: BLE001
+        pass
+
+    for wa, role in sorted(seen_on_mint.items(), key=lambda x: x[0]):
         if wa in KNOWN_SKIP:
             continue
-        if wa in cloud_set:
-            cloud_matches.append(
-                {
-                    "wallet": wa,
-                    "role": role,
-                    "on_cloud": True,
-                    "in_local_db": bool(db.wallet_exists(wa))
-                    if hasattr(db, "wallet_exists")
-                    else None,
-                }
-            )
+        if wa not in cloud_lookup:
+            continue
+        label = None
+        risk = None
+        notes = None
+        try:
+            if hasattr(db, "get_wallet"):
+                row = db.get_wallet(wa)
+                if row:
+                    label = row.get("label")
+                    risk = row.get("risk_score")
+                    notes = row.get("notes")
+            elif hasattr(db, "wallet_row"):
+                row = db.wallet_row(wa)
+                if row:
+                    label = row.get("label")
+                    risk = row.get("risk_score")
+                    notes = row.get("notes")
+        except Exception:  # noqa: BLE001
+            pass
+        cloud_matches.append(
+            {
+                "wallet": wa,
+                "address": wa,
+                "role": role,
+                "label": label,
+                "risk_score": risk,
+                "notes": (str(notes)[:200] if notes else None),
+                "on_cloud": True,
+                "in_local_db": bool(db.wallet_exists(wa))
+                if hasattr(db, "wallet_exists")
+                else None,
+            }
+        )
 
     n_cloud = len(cloud_matches)
+    addrs_only = [m["wallet"] for m in cloud_matches if m.get("wallet")]
     report["cloud_wallets_found"] = n_cloud
     report["cloud_wallets_count"] = n_cloud  # alias
-    report["cloud_wallets"] = cloud_matches
+    report["cloud_wallets"] = cloud_matches  # full list of match objects
+    report["cloud_wallets_list"] = addrs_only  # plain address array
+    report["cloud_wallets_text"] = "\n".join(addrs_only)  # pasteable full list
     report["cloud_checked"] = cloud_checked
     report["cloud_list_size"] = len(cloud_set)
     report["holders_checked"] = len(seen_on_mint)
