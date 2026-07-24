@@ -238,6 +238,65 @@
         mint: mint,
         deep: !!$("deepScan").checked,
       });
+      function logMatchSection(title, msg, n, rows, list, text, extraLine) {
+        log("══════════════════════════════════════");
+        log(title + ": " + msg);
+        if (extraLine) log("  " + extraLine);
+        if (n <= 0) {
+          log("  " + msg);
+          return;
+        }
+        log("  Full list (" + n + "):");
+        const useRows = Array.isArray(rows) ? rows : [];
+        const useList = Array.isArray(list)
+          ? list
+          : useRows
+              .map((c) => (c && (c.wallet || c.address)) || "")
+              .filter(Boolean);
+        if (useRows.length) {
+          useRows.forEach((c, i) => {
+            const addr = (c && (c.wallet || c.address)) || "";
+            const bits = [
+              String(i + 1).padStart(3, " ") + ".",
+              addr,
+              c && c.role ? "(" + c.role + ")" : "",
+              c && c.label ? "[" + c.label + "]" : "",
+              c && c.risk_score != null ? "score=" + c.risk_score : "",
+              c && c.on_cloud ? "cloud" : "",
+              c && c.in_local_db ? "db" : "",
+            ].filter(Boolean);
+            log("  " + bits.join(" "));
+          });
+        } else {
+          useList.forEach((addr, i) => {
+            log("  " + String(i + 1).padStart(3, " ") + ". " + addr);
+          });
+        }
+        if (text) {
+          log("  ── pasteable addresses (" + n + ") ──");
+          String(text)
+            .split(/\r?\n/)
+            .filter(Boolean)
+            .forEach((line) => log("  " + line));
+        }
+      }
+
+      const dbRows = Array.isArray(data.db_wallets) ? data.db_wallets : [];
+      const dbList = Array.isArray(data.db_wallets_list)
+        ? data.db_wallets_list
+        : dbRows.map((c) => (c && (c.wallet || c.address)) || "").filter(Boolean);
+      const nDb =
+        data.db_wallets_found != null
+          ? Number(data.db_wallets_found)
+          : data.db_wallets_count != null
+            ? Number(data.db_wallets_count)
+            : dbList.length;
+      const dbMsg =
+        data.db_found_message ||
+        (nDb === 0
+          ? "0 wallets found from DB"
+          : nDb + " wallet" + (nDb === 1 ? "" : "s") + " found from DB");
+
       const cloudRows = Array.isArray(data.cloud_wallets)
         ? data.cloud_wallets
         : [];
@@ -266,48 +325,36 @@
           " · type=" +
           (data.incident_type || "") +
           " · scan_flagged=" +
-          ((data.wallets_flagged || []).length || 0)
+          ((data.wallets_flagged || []).length || 0) +
+          " · DB=" +
+          nDb +
+          " · cloud=" +
+          nCloud
       );
-      log("══════════════════════════════════════");
-      log("CLOUD MATCHES: " + cloudMsg);
-      log(
-        "  holders checked=" +
+      logMatchSection(
+        "DB MATCHES",
+        dbMsg,
+        nDb,
+        dbRows,
+        dbList,
+        data.db_wallets_text,
+        "holders checked=" +
           (data.holders_checked != null ? data.holders_checked : "?") +
-          " · cloud list size=" +
+          " · local DB size=" +
+          (data.db_list_size != null ? data.db_list_size : "?")
+      );
+      logMatchSection(
+        "CLOUD MATCHES",
+        cloudMsg,
+        nCloud,
+        cloudRows,
+        cloudList,
+        data.cloud_wallets_text,
+        "cloud list size=" +
           (data.cloud_list_size != null ? data.cloud_list_size : "?") +
           " · cloud checked=" +
           (data.cloud_checked === true ? "yes" : "no")
       );
-      if (nCloud <= 0) {
-        log("  0 wallets found from cloud");
-      } else {
-        log("  Full list (" + nCloud + "):");
-        // Prefer full structured rows; fall back to plain address list
-        if (cloudRows.length) {
-          cloudRows.forEach((c, i) => {
-            const addr = (c && (c.wallet || c.address)) || "";
-            const bits = [
-              String(i + 1).padStart(3, " ") + ".",
-              addr,
-              c && c.role ? "(" + c.role + ")" : "",
-              c && c.label ? "[" + c.label + "]" : "",
-              c && c.risk_score != null ? "score=" + c.risk_score : "",
-            ].filter(Boolean);
-            log("  " + bits.join(" "));
-          });
-        } else {
-          cloudList.forEach((addr, i) => {
-            log("  " + String(i + 1).padStart(3, " ") + ". " + addr);
-          });
-        }
-        if (data.cloud_wallets_text) {
-          log("  ── pasteable addresses ──");
-          String(data.cloud_wallets_text)
-            .split(/\r?\n/)
-            .filter(Boolean)
-            .forEach((line) => log("  " + line));
-        }
-      }
       log("══════════════════════════════════════");
       (data.wallets_flagged || []).forEach((f) => {
         log(

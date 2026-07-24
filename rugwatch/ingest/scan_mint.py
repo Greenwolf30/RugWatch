@@ -336,42 +336,69 @@ def scan_and_ingest_mint(
     except Exception:  # noqa: BLE001
         pass
 
+    # ── Local DB: load full wallet index for matching ─────────────────
+    db_by_addr: dict[str, dict[str, Any]] = {}
+    try:
+        for row in db.list_wallets(min_score=0, limit=500_000) or []:
+            a = (row.get("address") or row.get("wallet") or "").strip()
+            if a:
+                db_by_addr[a] = dict(row)
+    except Exception as exc:  # noqa: BLE001
+        report["errors"].append(f"db_match_load: {exc}")
+
+    db_matches: list[dict[str, Any]] = []
+    cloud_matches = []  # reset if any prior; rebuild below
+
     for wa, role in sorted(seen_on_mint.items(), key=lambda x: x[0]):
         if wa in KNOWN_SKIP:
             continue
-        if wa not in cloud_lookup:
+        row = db_by_addr.get(wa)
+        on_cloud = wa in cloud_lookup
+        in_db = row is not None or (
+            hasattr(db, "wallet_exists") and bool(db.wallet_exists(wa))
+        )
+        if not in_db and not on_cloud:
             continue
-        label = None
-        risk = None
-        notes = None
-        try:
-            if hasattr(db, "get_wallet"):
-                row = db.get_wallet(wa)
+        label = (row or {}).get("label") if row else None
+        risk = (row or {}).get("risk_score") if row else None
+        notes = (row or {}).get("notes") if row else None
+        if row is None and in_db:
+            try:
+                row = db.get_wallet(wa) if hasattr(db, "get_wallet") else None
                 if row:
                     label = row.get("label")
                     risk = row.get("risk_score")
                     notes = row.get("notes")
-            elif hasattr(db, "wallet_row"):
-                row = db.wallet_row(wa)
-                if row:
-                    label = row.get("label")
-                    risk = row.get("risk_score")
-                    notes = row.get("notes")
-        except Exception:  # noqa: BLE001
-            pass
-        cloud_matches.append(
-            {
-                "wallet": wa,
-                "address": wa,
-                "role": role,
-                "label": label,
-                "risk_score": risk,
-                "notes": (str(notes)[:200] if notes else None),
-                "on_cloud": True,
-                "in_local_db": bool(db.wallet_exists(wa))
-                if hasattr(db, "wallet_exists")
-                else None,
-            }
+            except Exception:  # noqa: BLE001
+                pass
+        entry = {
+            "wallet": wa,
+            "address": wa,
+            "role": role,
+            "label": label,
+            "risk_score": risk,
+            "notes": (str(notes)[:200] if notes else None),
+            "on_cloud": on_cloud,
+            "in_local_db": bool(in_db),
+        }
+        if in_db:
+            db_matches.append(entry)
+        if on_cloud:
+            cloud_matches.append({**entry, "on_cloud": True})
+
+    n_db = len(db_matches)
+    db_addrs = [m["wallet"] for m in db_matches if m.get("wallet")]
+    report["db_wallets_found"] = n_db
+    report["db_wallets_count"] = n_db
+    report["db_wallets"] = db_matches  # full local DB match list
+    report["db_wallets_list"] = db_addrs
+    report["db_wallets_text"] = "\n".join(db_addrs)
+    report["db_list_size"] = len(db_by_addr)
+    if n_db == 0:
+        report["db_found_message"] = "0 wallets found from DB"
+    else:
+        report["db_found_message"] = (
+            f"{n_db} wallet{'s' if n_db != 1 else ''} found from DB"
         )
 
     n_cloud = len(cloud_matches)
@@ -400,9 +427,11 @@ def scan_and_ingest_mint(
         )
     elif not auto_flag:
         report["note"] = "Manual-only mode: no wallets suggested from this scan."
-    # Always include cloud line in note for output clarity
+    # Always include DB + cloud lines in note
     report["note"] = (
         ((report.get("note") or "").rstrip() + " · " if report.get("note") else "")
+        + report["db_found_message"]
+        + " · "
         + report["cloud_found_message"]
     )
     report["ok"] = True

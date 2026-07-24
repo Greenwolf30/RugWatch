@@ -633,20 +633,14 @@ class RugWatchHandler(BaseHTTPRequestHandler):
 
             result = scan_and_ingest_mint(mint, db=db, deep=deep)
             # Strip anything sensitive
-            n_cloud = int(result.get("cloud_wallets_found") or 0)
-            cloud_msg = result.get("cloud_found_message") or (
-                "0 wallets found from cloud"
-                if n_cloud == 0
-                else f"{n_cloud} wallets found from cloud"
-            )
-            # Full cloud match list — do not use list[:500] sanitize cap
-            raw_cloud = result.get("cloud_wallets") or []
-            if not isinstance(raw_cloud, list):
-                raw_cloud = []
-            cloud_rows = []
-            for item in raw_cloud[:20_000]:
-                if isinstance(item, dict):
-                    cloud_rows.append(
+            def _pack_wallet_rows(raw: Any, *, on_cloud_default: bool | None = None) -> list[dict]:
+                if not isinstance(raw, list):
+                    return []
+                out: list[dict] = []
+                for item in raw[:20_000]:
+                    if not isinstance(item, dict):
+                        continue
+                    out.append(
                         {
                             "wallet": item.get("wallet") or item.get("address"),
                             "address": item.get("address") or item.get("wallet"),
@@ -654,9 +648,37 @@ class RugWatchHandler(BaseHTTPRequestHandler):
                             "label": item.get("label"),
                             "risk_score": item.get("risk_score"),
                             "notes": item.get("notes"),
-                            "on_cloud": True,
+                            "on_cloud": item.get("on_cloud")
+                            if item.get("on_cloud") is not None
+                            else on_cloud_default,
+                            "in_local_db": item.get("in_local_db"),
                         }
                     )
+                return out
+
+            n_db = int(result.get("db_wallets_found") or 0)
+            db_msg = result.get("db_found_message") or (
+                "0 wallets found from DB"
+                if n_db == 0
+                else f"{n_db} wallets found from DB"
+            )
+            db_rows = _pack_wallet_rows(result.get("db_wallets") or [])
+            db_list = result.get("db_wallets_list") or [
+                r.get("wallet") for r in db_rows if r.get("wallet")
+            ]
+            db_text = result.get("db_wallets_text") or "\n".join(
+                str(a) for a in db_list if a
+            )
+
+            n_cloud = int(result.get("cloud_wallets_found") or 0)
+            cloud_msg = result.get("cloud_found_message") or (
+                "0 wallets found from cloud"
+                if n_cloud == 0
+                else f"{n_cloud} wallets found from cloud"
+            )
+            cloud_rows = _pack_wallet_rows(
+                result.get("cloud_wallets") or [], on_cloud_default=True
+            )
             cloud_list = result.get("cloud_wallets_list") or [
                 r.get("wallet") for r in cloud_rows if r.get("wallet")
             ]
@@ -672,7 +694,15 @@ class RugWatchHandler(BaseHTTPRequestHandler):
                 "auto_flag": result.get("auto_flag"),
                 "note": result.get("note"),
                 "wallets_flagged": sanitize_public(result.get("wallets_flagged") or []),
-                # Full cloud list + count (0 wallets found if none)
+                # Full LOCAL DB match list + count
+                "db_wallets_found": n_db,
+                "db_wallets_count": n_db,
+                "db_found_message": db_msg,
+                "db_wallets": db_rows,
+                "db_wallets_list": list(db_list)[:20_000],
+                "db_wallets_text": str(db_text or ""),
+                "db_list_size": result.get("db_list_size"),
+                # Full cloud list + count (0 if none)
                 "cloud_wallets_found": n_cloud,
                 "cloud_wallets_count": n_cloud,
                 "cloud_found_message": cloud_msg,
