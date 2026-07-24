@@ -1786,6 +1786,14 @@
       "source": "adtc_ruggers_export"
     },
     {
+      "address": "7DCYPyU5qakDkyeFmXqLEKQm9rZPXWt6jiBbELG6wdnS",
+      "chain_id": "solana",
+      "label": "ruggers_fresh_wallet_sellers",
+      "risk_score": 80,
+      "notes": "ruggers fresh_wallet_sellers \u00b7 $CloudDog \u00b7 mint Dr6NZTRgzHwX5b7DXz7Kq15wRWTw8ft9YCPZFWLepump \u00b7 100.0% sold of first bag \u00b7 not_listed",
+      "source": "adtc_ruggers_export"
+    },
+    {
       "address": "7DRdnYMBd6wg43zQqm3Wj5GywTeLQ3cZwhqVSUJsk5jV",
       "chain_id": "solana",
       "label": "ruggers_similar_sized_sellers",
@@ -2887,6 +2895,14 @@
       "label": "ruggers_similar_sized_sellers",
       "risk_score": 80,
       "notes": "ruggers similar_sized_sellers \u00b7 $Jimothy \u00b7 mint 9zoHCQgyPQFVkNxbF686XD4aENRMhMmkDutLuugFpump \u00b7 100.0% sold of first bag \u00b7 not_listed",
+      "source": "adtc_ruggers_export"
+    },
+    {
+      "address": "9z3KESNoz9HCjDSw7R1S6zH7u8VN9CtR4bixaVNTcZfn",
+      "chain_id": "solana",
+      "label": "ruggers_fresh_wallet_sellers",
+      "risk_score": 80,
+      "notes": "ruggers fresh_wallet_sellers \u00b7 $CloudDog \u00b7 mint Dr6NZTRgzHwX5b7DXz7Kq15wRWTw8ft9YCPZFWLepump \u00b7 100.0% sold of first bag \u00b7 not_listed",
       "source": "adtc_ruggers_export"
     },
     {
@@ -6026,7 +6042,7 @@
       "source": "adtc_ruggers_export"
     }
   ],
-  "count": 753,
+  "count": 755,
   "shard": 1,
   "total_shards": 1,
   "note": "RugWatch wallet list \u2014 cloud shard (same project on GitHub)"
