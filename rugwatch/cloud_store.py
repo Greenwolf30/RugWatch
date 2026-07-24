@@ -871,14 +871,21 @@ def push_to_cloud(db: RugWatchDB | None = None) -> dict[str, Any]:
                 "error": "Set RUGWATCH_GITHUB_REPO=YourUser/RugWatch (whole project on GitHub)",
             }
         result = push_to_repo(db)
-        # After merge push, strip any LP rows still living only on cloud
-        try:
-            scrub = scrub_lp_wallets_local_and_cloud(db)
-            if isinstance(result, dict):
-                result["lp_scrub"] = scrub
-        except Exception as exc:  # noqa: BLE001
-            if isinstance(result, dict):
-                result["lp_scrub"] = {"ok": False, "error": str(exc)}
+        # Optional post-push LP scrub (can be heavy / OOM free-tier Render).
+        # Skip by default on small dynos unless RUGWATCH_CLOUD_LP_SCRUB=1.
+        scrub_flag = (
+            os.environ.get("RUGWATCH_CLOUD_LP_SCRUB") or ""
+        ).strip().lower()
+        if scrub_flag in {"1", "true", "yes", "on"}:
+            try:
+                scrub = scrub_lp_wallets_local_and_cloud(db)
+                if isinstance(result, dict):
+                    result["lp_scrub"] = scrub
+            except Exception as exc:  # noqa: BLE001
+                if isinstance(result, dict):
+                    result["lp_scrub"] = {"ok": False, "error": str(exc)}
+        elif isinstance(result, dict):
+            result["lp_scrub"] = {"ok": True, "skipped": True, "note": "set RUGWATCH_CLOUD_LP_SCRUB=1 to enable"}
         return result
     return push_to_gist(db)
 

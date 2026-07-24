@@ -222,11 +222,17 @@ class RugWatchHandler(BaseHTTPRequestHandler):
         origin = self.headers.get("Origin") or ""
         allowed = _cors_allowed_origins()
         if allowed is None:
+            # Reflect request origin (or *) so browser CORS succeeds from ATC
             self.send_header("Access-Control-Allow-Origin", origin or "*")
         elif origin.rstrip("/") in allowed:
             self.send_header("Access-Control-Allow-Origin", origin)
+        else:
+            # Still set a header so preflight/error responses are debuggable
+            # (disallowed origins fail CORS correctly without reflecting)
+            self.send_header("Access-Control-Allow-Origin", allowed[0] if allowed else "*")
         self.send_header("Access-Control-Allow-Headers", "Content-Type, X-API-Token")
         self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+        self.send_header("Access-Control-Max-Age", "86400")
         self.end_headers()
         self.wfile.write(body)
 
@@ -553,8 +559,8 @@ class RugWatchHandler(BaseHTTPRequestHandler):
                         else ""
                     )
                 )
-            # ATC Ruggers Upload sends push_cloud=true — ALWAYS merge-push so
-            # wallets already local but missing from wiped cloud still land on GitHub.
+            # Optional inline push. Prefer separate POST /api/push-cloud from
+            # clients (ATC Ruggers) so a GitHub/OOM failure cannot 502 the import.
             push_flag = body.get("push_cloud")
             want_push = push_flag is True or str(push_flag).strip().lower() in {
                 "1",
@@ -566,7 +572,7 @@ class RugWatchHandler(BaseHTTPRequestHandler):
                 try:
                     from rugwatch.cloud_store import push_to_cloud
 
-                    pr = push_to_cloud(db)
+                    pr = push_to_cloud(db) or {}
                     out["cloud"] = {
                         "ok": bool(pr.get("ok")),
                         "wallet_count": pr.get("wallet_count"),
@@ -582,8 +588,21 @@ class RugWatchHandler(BaseHTTPRequestHandler):
                     }
                     if not pr.get("ok"):
                         out["cloud_error"] = pr.get("error")
+                        # Import still succeeded — do not fail the HTTP status
+                        out["note"] = (
+                            (out.get("note") or "")
+                            + " Import OK; push_cloud failed (use Push cloud button)."
+                        ).strip()
                 except Exception as exc:  # noqa: BLE001
-                    out["cloud"] = {"ok": False, "error": str(exc)}
+                    out["cloud"] = {
+                        "ok": False,
+                        "error": redact_text(str(exc)),
+                    }
+                    out["cloud_error"] = redact_text(str(exc))
+                    out["note"] = (
+                        (out.get("note") or "")
+                        + " Import OK; push_cloud raised (use /api/push-cloud)."
+                    ).strip()
             self._json(200, out)
             return
 
