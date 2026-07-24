@@ -254,6 +254,81 @@ def scan_and_ingest_mint(
         meta={"incident_type": incident_type},
     )
 
+    # ── Cloud list matches on this mint ───────────────────────────────
+    # How many wallets seen on this scan are already on the GitHub cloud list
+    # (or local DB after Pull cloud). Always report a number, including 0.
+    cloud_matches: list[dict[str, Any]] = []
+    cloud_checked = False
+    cloud_set: set[str] = set()
+    try:
+        from ..cloud_store import fetch_cloud_address_set
+
+        cloud_set = fetch_cloud_address_set() or set()
+        cloud_checked = True
+    except Exception as exc:  # noqa: BLE001
+        report["errors"].append(f"cloud_match: {exc}")
+        cloud_set = set()
+        # Fallback: local DB addresses (often hydrated from cloud on boot)
+        try:
+            for row in db.list_wallets(min_score=0, limit=200_000) or []:
+                a = (row.get("address") or row.get("wallet") or "").strip()
+                if a:
+                    cloud_set.add(a)
+            if cloud_set:
+                cloud_checked = True
+        except Exception:  # noqa: BLE001
+            pass
+
+    seen_on_mint: dict[str, str] = {}  # addr → role/source hint
+    if creator:
+        c = str(creator).strip()
+        if c:
+            seen_on_mint[c] = "creator"
+    for h in rc.get("holders") or []:
+        wa = (h.get("wallet") or h.get("address") or "").strip()
+        if not wa or len(wa) < 32:
+            continue
+        role = "insider" if h.get("insider") else "holder"
+        seen_on_mint.setdefault(wa, role)
+    if sc.get("ok"):
+        for h in sc.get("holders") or []:
+            wa = (h.get("wallet") or h.get("address") or "").strip()
+            if wa and len(wa) >= 32:
+                seen_on_mint.setdefault(wa, "holder")
+    for f in flagged:
+        wa = (f.get("wallet") or "").strip()
+        if wa:
+            seen_on_mint.setdefault(wa, f.get("role") or "scan")
+
+    for wa, role in seen_on_mint.items():
+        if wa in KNOWN_SKIP:
+            continue
+        if wa in cloud_set:
+            cloud_matches.append(
+                {
+                    "wallet": wa,
+                    "role": role,
+                    "on_cloud": True,
+                    "in_local_db": bool(db.wallet_exists(wa))
+                    if hasattr(db, "wallet_exists")
+                    else None,
+                }
+            )
+
+    n_cloud = len(cloud_matches)
+    report["cloud_wallets_found"] = n_cloud
+    report["cloud_wallets_count"] = n_cloud  # alias
+    report["cloud_wallets"] = cloud_matches
+    report["cloud_checked"] = cloud_checked
+    report["cloud_list_size"] = len(cloud_set)
+    report["holders_checked"] = len(seen_on_mint)
+    if n_cloud == 0:
+        report["cloud_found_message"] = "0 wallets found from cloud"
+    else:
+        report["cloud_found_message"] = (
+            f"{n_cloud} wallet{'s' if n_cloud != 1 else ''} found from cloud"
+        )
+
     report["wallets_flagged"] = flagged
     report["wallets_suggested"] = flagged  # alias
     if not auto_flag and flagged:
@@ -263,6 +338,11 @@ def scan_and_ingest_mint(
         )
     elif not auto_flag:
         report["note"] = "Manual-only mode: no wallets suggested from this scan."
+    # Always include cloud line in note for output clarity
+    report["note"] = (
+        ((report.get("note") or "").rstrip() + " · " if report.get("note") else "")
+        + report["cloud_found_message"]
+    )
     report["ok"] = True
     report["stats"] = db.stats()
     return report

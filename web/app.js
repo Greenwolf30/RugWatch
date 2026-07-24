@@ -238,14 +238,45 @@
         mint: mint,
         deep: !!$("deepScan").checked,
       });
+      const nCloud =
+        data.cloud_wallets_found != null
+          ? Number(data.cloud_wallets_found)
+          : data.cloud_wallets_count != null
+            ? Number(data.cloud_wallets_count)
+            : Array.isArray(data.cloud_wallets)
+              ? data.cloud_wallets.length
+              : 0;
+      const cloudMsg =
+        data.cloud_found_message ||
+        (nCloud === 0
+          ? "0 wallets found from cloud"
+          : nCloud +
+            " wallet" +
+            (nCloud === 1 ? "" : "s") +
+            " found from cloud");
       log(
         "Scan OK · " +
           (data.symbol || "") +
           " · type=" +
           (data.incident_type || "") +
           " · flagged=" +
-          ((data.wallets_flagged || []).length || 0)
+          ((data.wallets_flagged || []).length || 0) +
+          " · " +
+          cloudMsg
       );
+      log("  Cloud: " + cloudMsg);
+      if (nCloud > 0 && Array.isArray(data.cloud_wallets)) {
+        data.cloud_wallets.forEach((c) => {
+          log(
+            "  [cloud] " +
+              (c.role || "") +
+              ": " +
+              (c.wallet || c.address || "")
+          );
+        });
+      } else {
+        log("  [cloud] 0 wallets found");
+      }
       (data.wallets_flagged || []).forEach((f) => {
         log(
           "  [" +

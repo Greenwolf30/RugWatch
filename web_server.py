@@ -633,6 +633,12 @@ class RugWatchHandler(BaseHTTPRequestHandler):
 
             result = scan_and_ingest_mint(mint, db=db, deep=deep)
             # Strip anything sensitive
+            n_cloud = int(result.get("cloud_wallets_found") or 0)
+            cloud_msg = result.get("cloud_found_message") or (
+                "0 wallets found from cloud"
+                if n_cloud == 0
+                else f"{n_cloud} wallets found from cloud"
+            )
             safe = {
                 "ok": True,
                 "mint": result.get("mint") or mint,
@@ -642,6 +648,14 @@ class RugWatchHandler(BaseHTTPRequestHandler):
                 "auto_flag": result.get("auto_flag"),
                 "note": result.get("note"),
                 "wallets_flagged": sanitize_public(result.get("wallets_flagged") or []),
+                # Cloud list hits on this mint (always include count, 0 if none)
+                "cloud_wallets_found": n_cloud,
+                "cloud_wallets_count": n_cloud,
+                "cloud_found_message": cloud_msg,
+                "cloud_wallets": sanitize_public(result.get("cloud_wallets") or []),
+                "cloud_checked": bool(result.get("cloud_checked")),
+                "cloud_list_size": result.get("cloud_list_size"),
+                "holders_checked": result.get("holders_checked"),
                 "errors": sanitize_public(result.get("errors") or []),
             }
             self._json(200, safe)
