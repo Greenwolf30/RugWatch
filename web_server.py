@@ -330,7 +330,9 @@ class RugWatchHandler(BaseHTTPRequestHandler):
             except ValueError:
                 min_score = 0
             try:
-                limit = min(500, int((qs.get("limit") or ["100"])[0]))
+                # ATC (and tools) may request a large page to mirror local DB;
+                # cap for safety on free hosts.
+                limit = min(100_000, int((qs.get("limit") or ["100"])[0]))
             except ValueError:
                 limit = 100
             db = RugWatchDB()
@@ -677,6 +679,22 @@ class RugWatchHandler(BaseHTTPRequestHandler):
                 return
             with _monitor_lock:
                 _monitor_last_ok_at = time.time()
+            alert_count = int(result.get("alert_count") or 0)
+            found = result.get("found")
+            if found is None:
+                found = alert_count
+            try:
+                found = int(found)
+            except (TypeError, ValueError):
+                found = alert_count
+            found_message = result.get("found_message")
+            if not found_message:
+                if found == 0:
+                    found_message = "found 0"
+                elif found == 1:
+                    found_message = "found 1 match"
+                else:
+                    found_message = f"found {found} matches"
             safe = {
                 "ok": True,
                 "launches_scanned": result.get("launches_scanned"),
@@ -690,7 +708,9 @@ class RugWatchHandler(BaseHTTPRequestHandler):
                 "known_source": result.get("known_source"),
                 "cloud_source": result.get("cloud_source"),
                 "cloud_wallet_count": result.get("cloud_wallet_count"),
-                "alert_count": result.get("alert_count"),
+                "alert_count": alert_count,
+                "found": found,
+                "found_message": found_message,
                 "alerts": sanitize_public(result.get("alerts") or [])[:50],
                 "mints": sanitize_public(result.get("mints") or []),
                 "note": result.get("note"),

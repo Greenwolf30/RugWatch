@@ -372,8 +372,22 @@
         only_new: true,
         known_source: "local",
       });
+      // Always show found 0 / found N matches first (clear for one-click Monitor)
+      const foundN =
+        data.found != null
+          ? Number(data.found)
+          : data.alert_count != null
+            ? Number(data.alert_count)
+            : (data.alerts || []).length;
+      let foundMsg = data.found_message;
+      if (!foundMsg) {
+        if (!foundN) foundMsg = "found 0";
+        else if (foundN === 1) foundMsg = "found 1 match";
+        else foundMsg = "found " + foundN + " matches";
+      }
+      log("Monitor · " + foundMsg);
       log(
-        "Monitor · new_scanned=" +
+        "Monitor · scanned=" +
           (data.launches_scanned ?? "") +
           "/" +
           (data.launches_target ?? 25) +
@@ -385,12 +399,19 @@
           (data.known_wallets ?? "") +
           " src=" +
           (data.known_source || "local") +
-          " alerts=" +
-          (data.alert_count ?? 0)
+          " · " +
+          foundMsg
       );
       if (data.note) log("  " + data.note);
-      (data.alerts || []).forEach((a) => log("  ALERT: " + (a.message || "")));
-      if (data.alert_count) switchTab("alerts");
+      if (foundN > 0) {
+        log("  Matches: " + foundN);
+        (data.alerts || []).forEach((a) =>
+          log("  ALERT: " + (a.message || a.wallet || "match"))
+        );
+        switchTab("alerts");
+      } else {
+        log("  No known-wallet matches on this poll.");
+      }
       const cdSec =
         data.retry_after_seconds != null
           ? Number(data.retry_after_seconds)

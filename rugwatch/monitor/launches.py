@@ -173,6 +173,8 @@ def monitor_once(
             "cloud_wallet_count": int(cloud_meta.get("count") or 0),
             "alerts": [],
             "alert_count": 0,
+            "found": 0,
+            "found_message": "found 0",
             "stats": db.stats(),
         }
 
@@ -189,6 +191,8 @@ def monitor_once(
             "known_source": src,
             "alerts": [],
             "alert_count": 0,
+            "found": 0,
+            "found_message": "found 0",
             "stats": db.stats(),
         }
 
@@ -224,7 +228,16 @@ def monitor_once(
             all_alerts.extend(alerts)
 
     shortfall = max(0, limit - len(launches)) if only_new else 0
-    note_parts: list[str] = []
+    found = len(all_alerts)
+    # Always explicit for website UI: "found 0" or "found N match(es)"
+    if found == 0:
+        found_message = "found 0"
+    elif found == 1:
+        found_message = "found 1 match"
+    else:
+        found_message = f"found {found} matches"
+
+    note_parts: list[str] = [found_message + "."]
     if src == "cloud":
         note_parts.append(
             f"Matched against cloud list ({len(known)} wallet(s) score≥{min_score}, "
@@ -265,7 +278,10 @@ def monitor_once(
             or 0
         ),
         "alerts": all_alerts,
-        "alert_count": len(all_alerts),
+        "alert_count": found,
+        # Explicit match count for site log / UI
+        "found": found,
+        "found_message": found_message,
         "mints": mints_checked[:limit],
         "shortfall": shortfall,
         "note": " ".join(note_parts),
