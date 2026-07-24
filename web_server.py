@@ -263,6 +263,28 @@ class RugWatchHandler(BaseHTTPRequestHandler):
     def do_OPTIONS(self) -> None:  # noqa: N802
         self._send(204, b"", "text/plain")
 
+    def do_HEAD(self) -> None:  # noqa: N802
+        # Render / load balancers probe with HEAD. Default BaseHTTPHandler → 501
+        # which looks like a dead service and can trigger restarts / 502s.
+        parsed = urlparse(self.path)
+        path = parsed.path or "/"
+        if path in ("/", "/health", "/api/health", "/api/stats", "/api/ping"):
+            self.send_response(200)
+            self.send_header("Content-Type", "text/plain")
+            self.send_header("Content-Length", "0")
+            self.send_header("Cache-Control", "no-store")
+            origin = self.headers.get("Origin") or ""
+            allowed = _cors_allowed_origins()
+            if allowed is None:
+                self.send_header("Access-Control-Allow-Origin", origin or "*")
+            elif origin.rstrip("/") in allowed:
+                self.send_header("Access-Control-Allow-Origin", origin)
+            self.end_headers()
+            return
+        self.send_response(404)
+        self.send_header("Content-Length", "0")
+        self.end_headers()
+
     def do_GET(self) -> None:  # noqa: N802
         try:
             self._handle_get()
@@ -336,27 +358,15 @@ class RugWatchHandler(BaseHTTPRequestHandler):
             except ValueError:
                 min_score = 0
             try:
-                # ATC (and tools) may request a large page to mirror local DB;
-                # cap for safety on free hosts.
-                limit = min(100_000, int((qs.get("limit") or ["100"])[0]))
+                # Free-tier OOM: huge pages (limit=50000) + JSON inflate memory and
+                # the instance restarts right after a 200. Cap hard.
+                raw_lim = int((qs.get("limit") or ["100"])[0])
+                limit = max(1, min(5_000, raw_lim))
             except ValueError:
                 limit = 100
             db = RugWatchDB()
-            # If local DB empty but GitHub cloud has wallets, pull once (free Render disk).
-            try:
-                if (db.stats().get("wallets") or 0) == 0:
-                    from rugwatch.cloud_store import (
-                        cloud_enabled,
-                        ensure_cloud_cache,
-                        fetch_cloud_wallet_count,
-                    )
-
-                    if cloud_enabled():
-                        cc = fetch_cloud_wallet_count()
-                        if cc.get("ok") and (cc.get("count") or 0) > 0:
-                            ensure_cloud_cache(db)
-            except Exception:  # noqa: BLE001
-                pass
+            # Do NOT pull full cloud on a wallets list request (OOM / restart on free tier).
+            # Background boot already hydrates; manual Pull cloud if empty.
             rows = db.list_wallets(min_score=min_score, limit=limit)
             mint_map = db.wallet_mint_map()
             wallets_out = []
