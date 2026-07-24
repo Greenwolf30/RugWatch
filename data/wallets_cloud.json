@@ -5994,6 +5994,14 @@
       "source": "adtc_ruggers_export"
     },
     {
+      "address": "yoyBsvWgu66ohmeHam313qzVD9oDXeaiEDemQzSPfv9Y",
+      "chain_id": "solana",
+      "label": "probe",
+      "risk_score": 80,
+      "notes": "imported",
+      "source": "adtc_diag"
+    },
+    {
       "address": "zU6btyDDJW8Zu1KaLjQy4YgPJmFnPnrEprWCPRgNBLv",
       "chain_id": "solana",
       "label": "ruggers_similar_sized_sellers",
@@ -6018,7 +6026,7 @@
       "source": "adtc_ruggers_export"
     }
   ],
-  "count": 752,
+  "count": 753,
   "shard": 1,
   "total_shards": 1,
   "note": "RugWatch wallet list \u2014 cloud shard (same project on GitHub)"
