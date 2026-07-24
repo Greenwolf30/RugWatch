@@ -2290,6 +2290,14 @@
       "source": "adtc_ruggers_export"
     },
     {
+      "address": "8NRSnFtTDoFa31EvGEEb11n1rYBEzpUH9aNes6GH6Lab",
+      "chain_id": "solana",
+      "label": "ruggers_similar_sized_sellers",
+      "risk_score": 80,
+      "notes": "ruggers similar_sized_sellers \u00b7 $ChooChoo \u00b7 mint HqCqddd3PXXRTVaF89wk2QB7LvdKftiUqHDpGbV3pump \u00b7 100.0% sold of first bag \u00b7 not_listed",
+      "source": "adtc_ruggers_export"
+    },
+    {
       "address": "8NVkytV1CtoNBXGFtwXwh4KQdbgVcA6hFmym1gMuRHru",
       "chain_id": "solana",
       "label": "ruggers_similar_sellers",
@@ -3159,6 +3167,14 @@
       "label": "ruggers_similar_sized_sellers",
       "risk_score": 80,
       "notes": "ruggers similar_sized_sellers \u00b7 $peace \u00b7 mint DSXdcyhRPyrrXGgq8wFfr786HAPGy41oZ8ovmb6Zpump \u00b7 100.0% sold of first bag \u00b7 not_listed",
+      "source": "adtc_ruggers_export"
+    },
+    {
+      "address": "Ad8YGs4QWV3PfjtvTVgTKfxa2JhEtgRPESqi9XBaQHMF",
+      "chain_id": "solana",
+      "label": "ruggers_similar_sized_sellers",
+      "risk_score": 80,
+      "notes": "ruggers similar_sized_sellers \u00b7 $ChooChoo \u00b7 mint HqCqddd3PXXRTVaF89wk2QB7LvdKftiUqHDpGbV3pump \u00b7 100.0% sold of first bag \u00b7 not_listed",
       "source": "adtc_ruggers_export"
     },
     {
@@ -4370,6 +4386,14 @@
       "source": "adtc_ruggers_export"
     },
     {
+      "address": "E8jHYgJBNjY4iKnMBmXLdwrEqwSTWX71AK83Y2WEmSJu",
+      "chain_id": "solana",
+      "label": "ruggers_similar_sized_sellers",
+      "risk_score": 80,
+      "notes": "ruggers similar_sized_sellers \u00b7 $ChooChoo \u00b7 mint HqCqddd3PXXRTVaF89wk2QB7LvdKftiUqHDpGbV3pump \u00b7 100.0% sold of first bag \u00b7 not_listed",
+      "source": "adtc_ruggers_export"
+    },
+    {
       "address": "ECuz6AVetbhsipBLC8wqijoQUnnuwLFvSsJ14KM98SYf",
       "chain_id": "solana",
       "label": "ruggers_similar_sized_sellers",
@@ -5482,6 +5506,14 @@
       "source": "adtc_ruggers_export"
     },
     {
+      "address": "HMzASRHbLaWADqQS3Xm7fRArq31fZEnZhdtKrJZ2Mkks",
+      "chain_id": "solana",
+      "label": "ruggers_similar_sized_sellers",
+      "risk_score": 80,
+      "notes": "ruggers similar_sized_sellers \u00b7 $ChooChoo \u00b7 mint HqCqddd3PXXRTVaF89wk2QB7LvdKftiUqHDpGbV3pump \u00b7 100.0% sold of first bag \u00b7 not_listed",
+      "source": "adtc_ruggers_export"
+    },
+    {
       "address": "HPQhQMwTFpzb5ppfP4et4aUSd6eGPcK4YBKtt6zGXodw",
       "chain_id": "solana",
       "label": "ruggers_fresh_wallet_sellers",
@@ -6042,7 +6074,7 @@
       "source": "adtc_ruggers_export"
     }
   ],
-  "count": 755,
+  "count": 759,
   "shard": 1,
   "total_shards": 1,
   "note": "RugWatch wallet list \u2014 cloud shard (same project on GitHub)"
