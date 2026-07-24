@@ -1020,16 +1020,7 @@ class RugWatchDB:
                     symbol = sm.group(1)
 
             existed = self.wallet_exists(addr)
-            if skip_existing:
-                # Prefer cloud check first so callers can tell "already on GitHub"
-                if addr in also and not mint:
-                    skipped_cloud += 1
-                    skipped_existing += 1
-                    continue
-                if existed and not mint:
-                    skipped_local += 1
-                    skipped_existing += 1
-                    continue
+            on_cloud = addr in also
 
             try:
                 score = int(
@@ -1037,6 +1028,45 @@ class RugWatchDB:
                 )
             except (TypeError, ValueError):
                 score = 70
+
+            # Already on GitHub cloud list (count correctly even when mint is set —
+            # Ruggers always sends mint, so old "not mint" check never counted cloud).
+            if skip_existing and on_cloud and not mint:
+                skipped_cloud += 1
+                skipped_existing += 1
+                continue
+
+            if skip_existing and on_cloud and mint:
+                # On cloud already — still allow mint-link update on local row
+                if not existed:
+                    self.upsert_wallet(
+                        addr,
+                        chain_id=str(it.get("chain_id") or "solana"),
+                        label=str(it.get("label") or "manual"),
+                        risk_score=score,
+                        notes=notes,
+                        source=str(it.get("source") or source_default),
+                        bump_seen=True,
+                    )
+                    added += 1
+                else:
+                    skipped_cloud += 1
+                    skipped_existing += 1
+                is_new_link = self.link_wallet_mint(
+                    addr,
+                    mint,
+                    role=str(it.get("label") or "ruggers_flag")[:40],
+                    evidence=notes[:200] if notes else None,
+                )
+                if is_new_link:
+                    self.bump_mint_flag_count(mint, symbol=symbol or None, by=1)
+                also.add(addr)
+                continue
+
+            if skip_existing and existed and not mint:
+                skipped_local += 1
+                skipped_existing += 1
+                continue
 
             if not existed:
                 self.upsert_wallet(

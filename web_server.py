@@ -559,15 +559,22 @@ class RugWatchHandler(BaseHTTPRequestHandler):
             sk_loc = int(stats.get("skipped_local") or 0)
             sk_cloud = int(stats.get("skipped_cloud") or 0)
             if (stats.get("imported") or 0) == 0:
-                out["note"] = (
-                    f"No new local rows. skipped_cloud={sk_cloud} "
-                    f"(already on GitHub list), skipped_local={sk_loc} "
-                    f"(already in this server DB). "
-                    + (
-                        "Merge-push will still run to re-sync cloud from local."
-                        if True
-                        else ""
+                parts = []
+                if sk_cloud:
+                    parts.append(
+                        f"{sk_cloud} already on GitHub cloud list (skipped_cloud)"
                     )
+                if sk_loc:
+                    parts.append(
+                        f"{sk_loc} already in this server DB only (skipped_local) "
+                        "— still need Push cloud to land on GitHub if missing there"
+                    )
+                if not parts:
+                    parts.append("no new local rows")
+                out["note"] = (
+                    "No new local rows. "
+                    + "; ".join(parts)
+                    + ". Run Push cloud separately to merge local → GitHub."
                 )
             # Optional inline push. Prefer separate POST /api/push-cloud from
             # clients (ATC Ruggers) so a GitHub/OOM failure cannot 502 the import.
