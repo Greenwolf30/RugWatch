@@ -576,14 +576,33 @@
     log("Push cloud…");
     try {
       const data = await apiPost("/api/push-cloud", {});
+      const n =
+        data.pushed != null
+          ? Number(data.pushed)
+          : data.wallet_count != null
+            ? Number(data.wallet_count)
+            : 0;
+      const msg =
+        data.pushed_message ||
+        (n === 0
+          ? "Pushed 0 wallets to the cloud"
+          : n === 1
+            ? "Pushed 1 wallet to the cloud"
+            : "Pushed " + n + " wallets to the cloud");
+      log(msg);
       log(
-        "Push cloud OK · wallets=" +
-          (data.wallet_count ?? "?") +
-          (data.cloud_shards != null ? " · cloud_shards=" + data.cloud_shards : "") +
-          (data.path ? " · " + data.path : "") +
-          (data.index_path ? " · index=" + data.index_path : "") +
-          (data.html_url ? " · " + data.html_url : "")
+        "Push cloud OK · " +
+          msg +
+          " · cloud_before=" +
+          (data.cloud_before ?? "?") +
+          " · added_from_local=" +
+          (data.added_from_local ?? "?") +
+          " · local=" +
+          (data.local_count ?? "?") +
+          (data.cloud_shards != null ? " · shards=" + data.cloud_shards : "") +
+          (data.note ? " · " + data.note : "")
       );
+      if (data.html_url) log("  " + data.html_url);
       await refreshAll();
     } catch (e) {
       log("Push cloud failed: " + e.message);
@@ -667,19 +686,42 @@
     log("Pull cloud… (limit=" + limLabel + ")");
     try {
       const data = await apiPost("/api/pull-cloud", body);
+      const imported = Number(data.imported) || 0;
+      const skipped = Number(data.skipped) || 0;
+      const pulled =
+        data.pulled != null
+          ? Number(data.pulled)
+          : data.considered != null
+            ? Number(data.considered)
+            : imported + skipped;
+      const msg =
+        data.pulled_message ||
+        (pulled === 0
+          ? "Pulled 0 wallets from the cloud"
+          : pulled === 1
+            ? "Pulled 1 wallet from the cloud"
+            : "Pulled " + pulled + " wallets from the cloud");
+      log(msg);
       log(
-        "Pull cloud OK · imported=" +
-          (data.imported ?? 0) +
-          " · skipped=" +
-          (data.skipped ?? 0) +
-          " · db_wallets=" +
+        "Pull cloud OK · " +
+          msg +
+          " · new=" +
+          imported +
+          " · already in DB=" +
+          skipped +
+          " · local DB now=" +
           (data.db_wallets ?? "?") +
-          (data.considered != null ? " · considered=" + data.considered : "") +
           (data.max_wallets != null ? " · max=" + data.max_wallets : "") +
           (data.cloud_shards != null ? " · cloud_shards=" + data.cloud_shards : "") +
-          (data.local_shards != null ? " · local_shards=" + data.local_shards : "") +
-          (data.note ? " · " + data.note : "")
+          (data.local_shards != null ? " · local_shards=" + data.local_shards : "")
       );
+      if (data.note) log("  " + data.note);
+      if (pulled === 0 && imported === 0) {
+        log(
+          "  Tip: if cloud has wallets but pull is 0, check GITHUB_TOKEN / " +
+            "RUGWATCH_GITHUB_REPO on the server, or try Pull all after Clear DB."
+        );
+      }
       await refreshAll();
       switchTab("wallets");
     } catch (e) {
@@ -692,8 +734,8 @@
     if (
       !confirm(
         "Delete ALL wallets, incidents, and alerts from the LOCAL database?\n\n" +
-          "Cloud file is NOT cleared until you Push cloud.\n" +
-          "Export or Push cloud first if you need a backup."
+          "Cloud on GitHub is NOT cleared.\n" +
+          "Export or note the cloud list first if you need a backup."
       )
     ) {
       return;
@@ -701,7 +743,21 @@
     log("Clear DB…");
     try {
       const data = await apiPost("/api/clear-db", { confirm: true });
-      log("Database cleared · " + (data.note || "local wipe done"));
+      const n =
+        data.wallets_removed != null
+          ? Number(data.wallets_removed)
+          : data.cleared && data.cleared.wallets_removed != null
+            ? Number(data.cleared.wallets_removed)
+            : 0;
+      const msg =
+        data.cleared_message ||
+        (n === 0
+          ? "Cleared 0 wallets from local DB"
+          : n === 1
+            ? "Cleared 1 wallet from local DB"
+            : "Cleared " + n + " wallets from local DB");
+      log(msg);
+      log("Clear DB OK · " + msg + (data.note ? " · " + data.note : ""));
       await refreshAll();
     } catch (e) {
       log("Clear DB failed: " + e.message);

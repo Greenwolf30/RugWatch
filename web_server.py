@@ -857,18 +857,37 @@ class RugWatchHandler(BaseHTTPRequestHandler):
             result = push_to_cloud(db)
             # Never return tokens or raw file content — booleans + counts only
             err = result.get("error")
+            pushed_n = int(
+                result.get("pushed")
+                if result.get("pushed") is not None
+                else (result.get("wallet_count") or 0)
+            )
+            push_msg = result.get("pushed_message") or (
+                "Pushed 0 wallets to the cloud"
+                if pushed_n == 0
+                else (
+                    "Pushed 1 wallet to the cloud"
+                    if pushed_n == 1
+                    else f"Pushed {pushed_n} wallets to the cloud"
+                )
+            )
             safe = {
                 "ok": bool(result.get("ok")),
                 "action": result.get("action"),
                 "mode": result.get("mode"),
                 "wallet_count": result.get("wallet_count"),
+                "pushed": pushed_n,
+                "pushed_message": push_msg,
+                "added_from_local": result.get("added_from_local"),
+                "cloud_before": result.get("cloud_before"),
+                "local_count": result.get("local_count"),
                 "cloud_shards": result.get("cloud_shards"),
                 "index_path": result.get("index_path"),
                 "path": result.get("path"),  # repo-relative path, not a secret
                 "repo": result.get("repo"),
                 "html_url": result.get("html_url"),
                 "error": redact_text(str(err)) if err else None,
-                "note": result.get("note"),
+                "note": result.get("note") or push_msg,
             }
             self._json(200 if safe["ok"] else 400, sanitize_public(safe))
             return
@@ -970,18 +989,40 @@ class RugWatchHandler(BaseHTTPRequestHandler):
 
             result = pull_from_cloud(db, max_wallets=max_wallets)
             err = result.get("error")
+            imported = int(result.get("imported") or 0)
+            skipped = int(result.get("skipped") or 0)
+            considered = result.get("considered")
+            if considered is None:
+                considered = imported + skipped
+            pulled_n = int(
+                result.get("pulled")
+                if result.get("pulled") is not None
+                else considered
+                or 0
+            )
+            pull_msg = result.get("pulled_message") or (
+                "Pulled 0 wallets from the cloud"
+                if pulled_n == 0
+                else (
+                    "Pulled 1 wallet from the cloud"
+                    if pulled_n == 1
+                    else f"Pulled {pulled_n} wallets from the cloud"
+                )
+            )
             safe = {
                 "ok": bool(result.get("ok")),
-                "imported": result.get("imported"),
-                "skipped": result.get("skipped"),
+                "imported": imported,
+                "skipped": skipped,
+                "pulled": pulled_n,
+                "pulled_message": pull_msg,
                 "db_wallets": result.get("db_wallets"),
                 "source": result.get("source") or result.get("mode"),
                 "max_wallets": result.get("max_wallets"),
-                "considered": result.get("considered"),
+                "considered": considered,
                 "cloud_shards": result.get("cloud_shards"),
                 "local_shards": result.get("local_shards"),
                 "error": redact_text(str(err)) if err else None,
-                "note": result.get("note"),
+                "note": result.get("note") or pull_msg,
             }
             self._json(200 if safe["ok"] else 400, sanitize_public(safe))
             return
@@ -998,13 +1039,26 @@ class RugWatchHandler(BaseHTTPRequestHandler):
                         },
                     )
                     return
-            cleared = db.clear_all()
+            # Local wipe only — never push empty wipe to GitHub
+            cleared = db.clear_all(sync_cloud=False)
+            n_w = int((cleared or {}).get("wallets_removed") or 0)
+            if n_w == 0:
+                clear_msg = "Cleared 0 wallets from local DB"
+            elif n_w == 1:
+                clear_msg = "Cleared 1 wallet from local DB"
+            else:
+                clear_msg = f"Cleared {n_w} wallets from local DB"
             self._json(
                 200,
                 {
                     "ok": True,
                     "cleared": sanitize_public(cleared),
-                    "note": "Local DB wiped. Cloud file unchanged until you Push cloud.",
+                    "wallets_removed": n_w,
+                    "cleared_message": clear_msg,
+                    "note": (
+                        f"{clear_msg}. Cloud on GitHub was NOT changed "
+                        "(use Push cloud only if you intend to update cloud)."
+                    ),
                 },
             )
             return

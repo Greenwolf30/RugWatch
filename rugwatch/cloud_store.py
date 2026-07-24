@@ -471,6 +471,18 @@ def push_to_repo(db: RugWatchDB | None = None) -> dict[str, Any]:
 
     added = max(0, merged_n - cloud_before)
     ok = not errors and bool(shard_meta)
+    pushed_n = int(merged_n)
+    if pushed_n == 0:
+        push_msg = "Pushed 0 wallets to the cloud"
+    elif pushed_n == 1:
+        push_msg = "Pushed 1 wallet to the cloud"
+    else:
+        push_msg = f"Pushed {pushed_n} wallets to the cloud"
+    note = (
+        f"{push_msg} · cloud before={cloud_before} · local={local_n} · "
+        f"added from local={added} · shards={total_shards}. "
+        "Merge-only (cloud never shrinks)."
+    )
     return {
         "ok": ok or (bool(shard_meta) and not errors),
         "action": "merged",
@@ -483,18 +495,15 @@ def push_to_repo(db: RugWatchDB | None = None) -> dict[str, Any]:
         "raw_url": index_raw,
         "primary_raw_url": primary_raw,
         "wallet_count": len(wallets),
+        "pushed": pushed_n,
+        "pushed_message": push_msg,
         "cloud_before": cloud_before,
         "local_count": local_n,
         "added_from_local": added,
         "cloud_shards": total_shards,
         "shard_paths": [s["path"] for s in shard_meta],
         "errors": errors or None,
-        "note": (
-            f"Merge-only push: cloud had {cloud_before}, local {local_n}, "
-            f"result {merged_n} (+{added} new). "
-            f"Stored in {total_shards} shard file(s) (max {max_n}/file). "
-            "Cloud wallets are never erased by Push or Pull."
-        ),
+        "note": note,
     }
 
 
@@ -567,12 +576,26 @@ def pull_from_repo(
             "cloud_shards": 0,
         }
 
-    note_bits = []
+    # "Pulled N" = wallets read from cloud this run (not only brand-new inserts)
+    pulled_n = int(considered or (total_imported + total_skipped) or 0)
+    db_n = int((db.stats() or {}).get("wallets") or 0)
+    if pulled_n == 0 and not loaded_paths:
+        msg = "Pulled 0 wallets from the cloud (no cloud files loaded)"
+    elif pulled_n == 0:
+        msg = "Pulled 0 wallets from the cloud"
+    elif pulled_n == 1:
+        msg = "Pulled 1 wallet from the cloud"
+    else:
+        msg = f"Pulled {pulled_n} wallets from the cloud"
+    detail = (
+        f"{msg} · new into local DB={total_imported} · "
+        f"already in local DB={total_skipped} · local DB now={db_n}"
+    )
     if limited:
-        note_bits.append(
-            f"Limited pull: considered {considered} cloud wallet(s)"
-            + (f" (max {max_wallets})" if max_wallets else "")
-        )
+        detail += f" · limit={max_wallets}"
+    if missing:
+        detail += f" · missing files={len(missing)}"
+
     return {
         "ok": True,
         "mode": "repo",
@@ -582,12 +605,14 @@ def pull_from_repo(
         "paths": loaded_paths,
         "imported": total_imported,
         "skipped": total_skipped,
-        "db_wallets": db.stats().get("wallets"),
+        "pulled": pulled_n,
+        "pulled_message": msg,
+        "db_wallets": db_n,
         "cloud_shards": len(loaded_paths),
         "missing": missing or None,
         "max_wallets": max_wallets if limited else None,
-        "considered": considered if limited else None,
-        "note": "; ".join(note_bits) if note_bits else None,
+        "considered": considered if limited or considered else considered,
+        "note": detail,
         "local_shards": db.stats().get("local_shards"),
     }
 

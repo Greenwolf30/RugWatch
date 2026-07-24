@@ -1080,7 +1080,9 @@ class RugWatchDB:
                 )
                 added += 1
             elif mint:
-                # Existing wallet but new mint flag link — still count the flag event
+                # Already in local DB — still refresh mint link, but count as skip
+                # (cloud notes almost always contain "mint …", so this was
+                # previously neither imported nor skipped → pull looked broken).
                 self.upsert_wallet(
                     addr,
                     chain_id=str(it.get("chain_id") or "solana"),
@@ -1090,6 +1092,9 @@ class RugWatchDB:
                     source=str(it.get("source") or source_default),
                     bump_seen=True,
                 )
+                if skip_existing:
+                    skipped_local += 1
+                    skipped_existing += 1
             else:
                 skipped_local += 1
                 skipped_existing += 1
