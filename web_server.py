@@ -961,9 +961,9 @@ def main(argv: list[str] | None = None) -> int:
         print(f"Missing web UI folder: {WEB_DIR}", file=sys.stderr)
         return 1
 
-    # Free Render wipes local SQLite on restart — rehydrate from GitHub cloud.
-    _boot_pull_cloud()
-
+    # Bind + answer health checks FIRST so Render does not 502 while GitHub
+    # cloud pull runs (free tier cold start / deploy). Local SQLite is empty
+    # until the background pull finishes — Push/Upload still work after that.
     httpd = ThreadingHTTPServer((args.host, args.port), RugWatchHandler)
     print(f"{__app_name__} web  http://{args.host}:{args.port}/")
     print("Keys stay on the server (.env). Never put HELIUS/etc in web/config.js.")
@@ -971,6 +971,16 @@ def main(argv: list[str] | None = None) -> int:
         print("WEB_API_TOKEN is set — browser must send X-API-Token for POST APIs.")
     else:
         print("WARN: WEB_API_TOKEN unset — POST APIs are open on this host.")
+
+    def _bg_cloud() -> None:
+        try:
+            print("Cloud boot: starting background pull…", flush=True)
+            _boot_pull_cloud()
+        except Exception as exc:  # noqa: BLE001
+            print(f"Cloud boot background failed: {exc}", file=sys.stderr)
+
+    threading.Thread(target=_bg_cloud, name="rugwatch-cloud-boot", daemon=True).start()
+
     try:
         httpd.serve_forever()
     except KeyboardInterrupt:
